@@ -102,15 +102,13 @@ private data class DriveSpeeds(
  * plus and minus signs go, use the following picture.  It shows arrows in the
  * direction that each wheel pushes the robot when it is driven forwards.
  *
- *        __      __
- *        /|      |\
- * front /          \ front
- * left  -+--------+- right
- *        |        |
- *    __  | ^    ^ |  __
- *    |\  |   __   |  /|
- * back \ |        | /  back
- * left  -+--------+-   right
+ *  front ↗️        ↖️ front
+ *  left  -+--------+- right
+ *         |        |
+ *         | ^    ^ |
+ *         |   __   |
+ * back ↖️ |        | ↗️ back
+ * left   -+--------+-   right
  */
 
 private fun driveSpeedsToWheelSpeeds(ds: DriveSpeeds): WheelSpeeds =
