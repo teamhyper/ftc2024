@@ -1,57 +1,23 @@
 package org.firstinspires.ftc.teamcode
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import com.qualcomm.robotcore.eventloop.opmode.OpModeManager
+import com.qualcomm.robotcore.eventloop.opmode.OpModeRegistrar
 import com.qualcomm.robotcore.hardware.DcMotor
 
-@TeleOp(name = "front_left")
-class FrontLeft : OpMode() {
-    private lateinit var motor: DcMotor
-
-    override fun init() {
-        motor = hardwareMap.get(DcMotor::class.java, "front_left")
-    }
-
-    override fun loop() {
-        motor.power = -gamepad1.left_stick_y.toDouble()
-        telemetry.addData("power", motor.power)
+@OpModeRegistrar
+fun registerMotors(manager: OpModeManager) {
+    val motors = listOf("front_left", "front_right", "back_left", "back_right", "arm")
+    for (m in motors) {
+        manager.register("$m test", MotorTest(m))
     }
 }
 
-@TeleOp(name = "front_right")
-class FrontRight : OpMode() {
+class MotorTest(val motorName: String) : OpMode() {
     private lateinit var motor: DcMotor
 
     override fun init() {
-        motor = hardwareMap.get(DcMotor::class.java, "front_right")
-    }
-
-    override fun loop() {
-        motor.power = -gamepad1.left_stick_y.toDouble()
-        telemetry.addData("power", motor.power)
-    }
-}
-
-@TeleOp(name = "back_left")
-class BackLeft : OpMode() {
-    private lateinit var motor: DcMotor
-
-    override fun init() {
-        motor = hardwareMap.get(DcMotor::class.java, "back_left")
-    }
-
-    override fun loop() {
-        motor.power = -gamepad1.left_stick_y.toDouble()
-        telemetry.addData("power", motor.power)
-    }
-}
-
-@TeleOp(name = "back_right")
-class BackRight : OpMode() {
-    private lateinit var motor: DcMotor
-
-    override fun init() {
-        motor = hardwareMap.get(DcMotor::class.java, "back_right")
+        motor = hardwareMap.get(DcMotor::class.java, motorName)
     }
 
     override fun loop() {
