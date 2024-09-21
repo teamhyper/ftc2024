@@ -307,19 +307,19 @@ class Drive : OpMode() {
          * breaks, instead of coasting, when we set its power to 0.
          */
         frontLeft = hardwareMap.get(DcMotor::class.java, "front_left")
-        frontLeft.direction = DcMotorSimple.Direction.REVERSE
+        frontLeft.direction = DcMotorSimple.Direction.FORWARD
         frontLeft.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 
         frontRight = hardwareMap.get(DcMotor::class.java, "front_right")
-        frontRight.direction = DcMotorSimple.Direction.FORWARD
+        frontRight.direction = DcMotorSimple.Direction.REVERSE
         frontRight.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 
         backLeft = hardwareMap.get(DcMotor::class.java, "back_left")
-        backLeft.direction = DcMotorSimple.Direction.REVERSE
+        backLeft.direction = DcMotorSimple.Direction.FORWARD
         backLeft.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 
         backRight = hardwareMap.get(DcMotor::class.java, "back_right")
-        backRight.direction = DcMotorSimple.Direction.FORWARD
+        backRight.direction = DcMotorSimple.Direction.REVERSE
         backRight.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
 
