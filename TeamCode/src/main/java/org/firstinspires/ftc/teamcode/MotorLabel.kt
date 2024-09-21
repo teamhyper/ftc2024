@@ -18,10 +18,12 @@ class MotorTest(val motorName: String) : OpMode() {
 
     override fun init() {
         motor = hardwareMap.get(DcMotor::class.java, motorName)
+        motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
 
     override fun loop() {
         motor.power = -gamepad1.left_stick_y.toDouble()
         telemetry.addData("power", motor.power)
+        telemetry.addData("position", motor.currentPosition)
     }
 }
