@@ -25,8 +25,8 @@ const val CAMERA_PITCH = 0.0
 const val CAMERA_ROLL = 0.0
 
 // in pixels
-const val CAMERA_WIDTH = 1
-const val CAMERA_HEIGHT = 1
+const val CAMERA_WIDTH = 640
+const val CAMERA_HEIGHT = 480
 
 // trade-off between speed and accuracy, this is default
 const val DECIMATION = 3.0f
