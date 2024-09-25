@@ -7,13 +7,13 @@ import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.util.ElapsedTime
 import java.io.Writer
 import java.text.SimpleDateFormat
-import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sin
 
 private fun<T> withOutputFile(block: (Writer) -> T): T {
-    val now = Calendar.getInstance()
+    val now = Date()
     val format = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
     val pathInSdCard = "FIRST/datalogs/experiment_${format.format(now)}.csv"
     val file = Environment.getExternalStorageDirectory().resolve(pathInSdCard)
@@ -30,8 +30,8 @@ private fun Writer.writeRow(time: Double, power: Double, position: Int) {
 }
 
 private fun controlSignal(time: Double): Double {
-    val frequency = 10   // Hz
-    val amplitude = 0.5  // % power
+    val frequency = 1   // Hz
+    val amplitude = 0.3  // % power
     return amplitude * sin(time * frequency * 2 * PI)
 }
 
@@ -41,7 +41,7 @@ class RunExperiment : LinearOpMode() {
         // initialize
         telemetry.addData("status", "initializing")
         val timer = ElapsedTime()
-        val motor = hardwareMap.get(DcMotor::class.java, "arm_motor")
+        val motor = hardwareMap.get(DcMotor::class.java, "arm")
 
         // wait for operator
         telemetry.addData("status", "ready")
