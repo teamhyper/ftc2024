@@ -68,7 +68,7 @@ fun makeVisionPortal(webcam: CameraName, vararg processors: VisionProcessor): Vi
         .setAutoStopLiveView(false)
         .setCamera(webcam)
         .setCameraResolution(Size(CAMERA_WIDTH, CAMERA_HEIGHT))
-        .setLiveViewContainerId(1)
+        .enableLiveView(false)
         .setShowStatsOverlay(true)
         .setStreamFormat(StreamFormat.MJPEG)
         .build()
@@ -84,7 +84,6 @@ class AprilTagDemo : OpMode() {
         val camera = hardwareMap.get(CameraName::class.java, "front_camera")
         vision = makeVisionPortal(camera, aprilTags)
         vision.resumeStreaming()
-        vision.resumeLiveView()
     }
 
     override fun loop() {
