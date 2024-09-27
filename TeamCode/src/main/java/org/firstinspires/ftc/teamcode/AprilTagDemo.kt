@@ -92,9 +92,13 @@ class AprilTagDemo : OpMode() {
         telemetry.addLine("found ${tags.count()} tags")
         for (tag in tags) {
             telemetry.addLine("----- BEGIN TAG ${tag.id} -----")
-            telemetry.addLine("range (m): ${tag.ftcPose.range}")
-            telemetry.addLine("bearing (rad): ${tag.ftcPose.bearing}")
-            telemetry.addLine("elevation (rad): ${tag.ftcPose.elevation}")
+            telemetry.addLine("field units: ${tag.metadata.distanceUnit}")
+            telemetry.addLine("field x: ${tag.metadata.fieldPosition[0]}")
+            telemetry.addLine("field y: ${tag.metadata.fieldPosition[1]}")
+            telemetry.addLine("field z: ${tag.metadata.fieldPosition[2]}")
+            telemetry.addLine("robot-relative x (m): ${tag.ftcPose.x}")
+            telemetry.addLine("robot-relative y (m): ${tag.ftcPose.y}")
+            telemetry.addLine("robot-relative z (m): ${tag.ftcPose.z}")
             telemetry.addLine("----- END TAG ${tag.id} -----")
         }
         telemetry.addLine("----- END TAGS -----")
