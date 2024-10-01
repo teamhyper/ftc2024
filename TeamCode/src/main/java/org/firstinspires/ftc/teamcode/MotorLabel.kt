@@ -4,6 +4,8 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.OpModeManager
 import com.qualcomm.robotcore.eventloop.opmode.OpModeRegistrar
 import com.qualcomm.robotcore.hardware.DcMotor
+import com.qualcomm.robotcore.hardware.DcMotorEx
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 
 @OpModeRegistrar
 fun registerMotors(manager: OpModeManager) {
@@ -14,16 +16,18 @@ fun registerMotors(manager: OpModeManager) {
 }
 
 class MotorTest(val motorName: String) : OpMode() {
-    private lateinit var motor: DcMotor
+    private lateinit var motor: DcMotorEx
 
     override fun init() {
-        motor = hardwareMap.get(DcMotor::class.java, motorName)
+        motor = hardwareMap.get(DcMotorEx::class.java, motorName)
         motor.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
 
     override fun loop() {
         motor.power = -gamepad1.left_stick_y.toDouble()
-        telemetry.addData("power", motor.power)
-        telemetry.addData("position", motor.currentPosition)
+
+        telemetry.addData("power (%)", motor.power)
+        telemetry.addData("position (ticks)", motor.currentPosition)
+        telemetry.addData("current (A)", motor.getCurrent(CurrentUnit.AMPS))
     }
 }
