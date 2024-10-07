@@ -4,7 +4,7 @@ import org.firstinspires.ftc.teamcode.core.types.Command
 import org.firstinspires.ftc.teamcode.core.types.Control
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
 
-interface Controller {
+fun interface Controller {
     /*
      * Decide what control signal to send to actuators.  This decision is based
      * on the command, as well as our current estimate of the state.  The

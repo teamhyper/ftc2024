@@ -4,7 +4,7 @@ import org.firstinspires.ftc.teamcode.core.types.Command
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
 import org.firstinspires.ftc.teamcode.core.types.UserInput
 
-interface Planner {
+fun interface Planner {
     /*
      * Decide what command the robot should currently be following, based on
      * user input and state estimates.  The output of this function contains
