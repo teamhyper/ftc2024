@@ -11,7 +11,7 @@
  * the file is stored.
  */
 
-package org.firstinspires.ftc.teamcode
+package org.firstinspires.ftc.teamcode.samples
 
 /*
  * Later, we will refer to concepts from the FIRST-provided libraries.  Kotlin
@@ -19,11 +19,16 @@ package org.firstinspires.ftc.teamcode
  * we list them here.  These will be explained when we get to them.
  */
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.Gamepad
+import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraName
+import org.firstinspires.ftc.vision.VisionPortal
+import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase
+import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -252,7 +257,8 @@ private fun writeWheelSpeeds(
  * or "mode of operation".
  */
 
-@TeleOp(name = "Kotlin Drive Test")
+@TeleOp(name = "Drive Test")
+@Disabled /* remove this line to enable! */
 class Drive : OpMode() {
 
     /*
@@ -283,6 +289,9 @@ class Drive : OpMode() {
     private lateinit var backLeft: DcMotor
     private lateinit var backRight: DcMotor
 
+    private lateinit var vision: VisionPortal
+    private lateinit var aprilTags: AprilTagProcessor
+
     /*
      * Here we see two new words.  `var` stands for variable, and is a bit like
      * val, except we are allowed to change it after we declare it.  I never
@@ -307,20 +316,35 @@ class Drive : OpMode() {
          * breaks, instead of coasting, when we set its power to 0.
          */
         frontLeft = hardwareMap.get(DcMotor::class.java, "front_left")
-        frontLeft.direction = DcMotorSimple.Direction.FORWARD
+        frontLeft.direction = DcMotorSimple.Direction.REVERSE
         frontLeft.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 
         frontRight = hardwareMap.get(DcMotor::class.java, "front_right")
-        frontRight.direction = DcMotorSimple.Direction.REVERSE
+        frontRight.direction = DcMotorSimple.Direction.FORWARD
         frontRight.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 
         backLeft = hardwareMap.get(DcMotor::class.java, "back_left")
-        backLeft.direction = DcMotorSimple.Direction.FORWARD
+        backLeft.direction = DcMotorSimple.Direction.REVERSE
         backLeft.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 
         backRight = hardwareMap.get(DcMotor::class.java, "back_right")
-        backRight.direction = DcMotorSimple.Direction.REVERSE
+        backRight.direction = DcMotorSimple.Direction.FORWARD
         backRight.zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+
+        val camera = hardwareMap.get(CameraName::class.java, "front_camera")
+
+        aprilTags = AprilTagProcessor.Builder()
+            .setDrawCubeProjection(true)
+            .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
+            .setTagLibrary(AprilTagGameDatabase.getIntoTheDeepTagLibrary())
+            .build()
+
+        vision = VisionPortal.Builder()
+            .setCamera(camera)
+            .addProcessors(aprilTags)
+            .build()
+
+        vision.resumeStreaming()
     }
 
     /*
@@ -354,5 +378,15 @@ class Drive : OpMode() {
         telemetry.addData("drive speeds", driveSpeeds)
         telemetry.addData("raw wheel speeds", rawWheelSpeeds)
         telemetry.addData("wheel speeds", wheelSpeeds)
+
+        val leftPosition = frontLeft.currentPosition
+        val rightPosition = -frontRight.currentPosition
+        val centerPosition = backRight.currentPosition
+
+        telemetry.addData("left encoder", leftPosition)
+        telemetry.addData("right encoder", rightPosition)
+        telemetry.addData("center encoder", centerPosition)
+
+        telemetry.addData("motor mode", frontLeft.mode)
     }
 }
