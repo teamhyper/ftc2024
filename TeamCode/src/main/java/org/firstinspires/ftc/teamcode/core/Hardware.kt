@@ -22,6 +22,8 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.IMU
 import com.qualcomm.robotcore.hardware.Servo
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.teamcode.core.types.AprilTagMeasurement
 import org.firstinspires.ftc.teamcode.core.types.ClawCameraMeasurement
 import org.firstinspires.ftc.teamcode.core.types.ClawControl
@@ -89,17 +91,6 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
     val rightDriveEncoder = frontRightDriveMotor
     val centerDriveEncoder = backRightDriveMotor
 
-    /*
-     * We report only the number of ticks since the last cycle, to get velocity
-     * in units of "ticks per cycle time".  To make this work we keep track of
-     * the last read encoder position.  Control code can integrate this if it
-     * needs an absolute measurement.  This also means we never need to ask
-     * the hardware to reset itself.
-     */
-    var leftDriveLastPosition = leftDriveEncoder.currentPosition
-    var rightDriveLastPosition = rightDriveEncoder.currentPosition
-    var centerDriveLastPosition = centerDriveEncoder.currentPosition
-
     /* The IMU is additionally used by the drivetrain for state estimation. */
     val imu = hw.getIMU("imu").apply {
         val orientation = RevHubOrientationOnRobot(
@@ -110,18 +101,13 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
         resetYaw()
     }
 
-    /*
-     * We also report only the delta yaw measured from the IMU.  This is
-     * initialized to zero since we just called resetYaw().
-     */
-    var imuLastYawRads = 0.0
-
     /* The drive camera is used for detecting AprilTags. */
     val driveAprilTagProcessor = AprilTagProcessor.Builder()
         .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
         .setTagLibrary(AprilTagGameDatabase.getIntoTheDeepTagLibrary())
         .setDrawCubeProjection(true)
         .setCameraPose(driveCameraPosition(), driveCameraOrientation())
+        .setOutputUnits(DistanceUnit.METER, AngleUnit.RADIANS)
         .build()
     init {
         VisionPortal.Builder()
@@ -148,10 +134,6 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
         scaleRange(CLAW_GRIP_MIN_POSITION, CLAW_GRIP_MAX_POSITION)
     }
 
-    /* The last recorded positions of each claw lift encoder. */
-    var leftClawLiftLastPosition = leftClawLiftMotor.currentPosition
-    var rightClawLiftLastPosition = rightClawLiftMotor.currentPosition
-
     /*
      * Set all control hubs to use MANUAL mode.  This improves performance, but
      * means that the cache must manually be cleared on each iteration.  See
@@ -166,35 +148,18 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
         controlHubs.forEach { it.clearBulkCache() }
     }
 
-    fun measureDriveEncoders(): DriveEncoderMeasurement {
-        val leftDriveDelta =
-            leftDriveEncoder.currentPosition - leftDriveLastPosition
-        leftDriveLastPosition += leftDriveDelta
-        val rightDriveDelta =
-            rightDriveEncoder.currentPosition - rightDriveLastPosition
-        rightDriveLastPosition += rightDriveDelta
-        val centerDriveDelta =
-            centerDriveEncoder.currentPosition - centerDriveLastPosition
-        centerDriveLastPosition += centerDriveDelta
+    fun measureDriveEncoders() = DriveEncoderMeasurement(
+        leftMeters = leftDriveEncoder.currentPosition * ODOMETRY_METERS_PER_TICK,
+        rightMeters = rightDriveEncoder.currentPosition * ODOMETRY_METERS_PER_TICK,
+        centerMeters = centerDriveEncoder.currentPosition * ODOMETRY_METERS_PER_TICK,
+    )
 
-        return DriveEncoderMeasurement(
-            leftMetersPerCycle = leftDriveDelta * ODOMETRY_METERS_PER_TICK,
-            rightMetersPerCycle = rightDriveDelta * ODOMETRY_METERS_PER_TICK,
-            centerMetersPerCycle = centerDriveDelta * ODOMETRY_METERS_PER_TICK,
-        )
-    }
+    fun measureIMU() = IMUMeasurement(
+        yawRads = imu.robotYawPitchRollAngles.getYaw(AngleUnit.RADIANS)
+    )
 
-    fun measureIMU(): IMUMeasurement {
-        val yawDeltaRads = imu.robotYawPitchRollAngles.yaw - imuLastYawRads
-        imuLastYawRads += yawDeltaRads
-
-        return IMUMeasurement(
-            yawRadsPerCycle = yawDeltaRads
-        )
-    }
-
-    fun measureDriveCamera(): DriveCameraMeasurement {
-        val tags = driveAprilTagProcessor.freshDetections
+    fun measureDriveCamera() = DriveCameraMeasurement(
+        aprilTags = driveAprilTagProcessor.freshDetections
             ?.map {
                 AprilTagMeasurement(
                     id = it.id,
@@ -204,35 +169,24 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
                 )
             }
             ?: emptyList()
+    )
 
-        return DriveCameraMeasurement(tags)
-    }
+    fun measureDrive() = DriveMeasurement(
+        measureDriveEncoders(),
+        measureIMU(),
+        measureDriveCamera(),
+    )
 
-    fun measureDrive(): DriveMeasurement =
-        DriveMeasurement(
-            measureDriveEncoders(),
-            measureIMU(),
-            measureDriveCamera(),
-        )
+    fun measureClawCamera() = ClawCameraMeasurement(todo = Unit)
 
-    fun measureClawCamera(): ClawCameraMeasurement =
-        ClawCameraMeasurement(todo = Unit)
-
-    fun measureClaw(): ClawMeasurement {
-        val leftDelta =
-            leftClawLiftMotor.currentPosition - leftClawLiftLastPosition
-        leftClawLiftLastPosition += leftDelta
-        val rightDelta =
-            rightClawLiftMotor.currentPosition - rightClawLiftLastPosition
-        rightClawLiftLastPosition += rightDelta
-        val averageDelta = (leftDelta + rightDelta) / 2.0
-
-        return ClawMeasurement(
-            heightMetersPerCycle = averageDelta * CLAW_LIFT_METERS_PER_TICK,
+    fun measureClaw() = ClawMeasurement(
+            heightMeters = CLAW_LIFT_METERS_PER_TICK * 0.5 * (
+                    rightClawLiftMotor.currentPosition +
+                    leftClawLiftMotor.currentPosition
+                    ),
             isHome = clawLiftLimit.isPressed,
             camera = measureClawCamera(),
         )
-    }
 
     /*
      * Called at the start of each control cycle.  Read data from all sensors.

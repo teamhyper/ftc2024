@@ -5,13 +5,13 @@
 package org.firstinspires.ftc.teamcode.core.types
 
 data class DriveEncoderMeasurement(
-    val leftMetersPerCycle: Double,
-    val rightMetersPerCycle: Double,
-    val centerMetersPerCycle: Double,
+    val leftMeters: Double,
+    val rightMeters: Double,
+    val centerMeters: Double,
 )
 
 data class IMUMeasurement(
-    val yawRadsPerCycle: Double
+    val yawRads: Double
 )
 
 data class AprilTagMeasurement(
@@ -36,7 +36,7 @@ data class DriveMeasurement(
 )
 
 data class ClawMeasurement(
-    val heightMetersPerCycle: Double,
+    val heightMeters: Double,
     val isHome: Boolean,
     val camera: ClawCameraMeasurement,
 )
