@@ -15,7 +15,7 @@ const val CYCLE_PERIOD_SECONDS = 0.01 /* 10 ms -> 100 Hz */
 /* see: https://www.gobilda.com/4-bar-odometry-pod-32mm-wheel/ */
 const val ODOMETRY_PPR = 2000
 const val ODOMETRY_WHEEL_DIAMETER_METERS = 0.032
-const val ODOMETRY_METERS_PER_TICK = PI * ODOMETRY_PPR * ODOMETRY_WHEEL_DIAMETER_METERS
+const val ODOMETRY_METERS_PER_TICK = PI * ODOMETRY_WHEEL_DIAMETER_METERS / ODOMETRY_PPR
 
 /* TODO: populate these values */
 const val DRIVE_CAMERA_X_METERS = 0.0
