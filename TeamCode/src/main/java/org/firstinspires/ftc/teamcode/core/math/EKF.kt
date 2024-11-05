@@ -5,12 +5,34 @@ import org.jetbrains.kotlinx.multik.api.linalg.*
 import org.jetbrains.kotlinx.multik.ndarray.data.*
 import org.jetbrains.kotlinx.multik.ndarray.operations.*
 
+/*
+ * This file implements a domain-specific language for extended kalman filter
+ * (ekf) applications.  First, we describe the interface.  The user supplies
+ * this module with a model of the system's dynamics.  There are three
+ * main operations, and each involves specifying a model: initialization,
+ * time update, and measurement update.  Each model consists of a set of
+ * equations.
+ *
+ * To run the EKF, we need not only the values but also the derivatives of the
+ * expressions appearing in these models, with respect to uncertain input
+ * variables.  These input variables can either be part of the current state,
+ * or they can be sources of noise.  We use the convention that we have
+ * countably many noise variables, each with mean 0 and variance 1.
+ */
+
 sealed class EKFVar() {
     data class StateVar(val name: Int): EKFVar()
     data class NoiseVar(val name: Int): EKFVar()
 }
 
 typealias EKFExpr = Expr<EKFVar>
+
+/*
+ * The following interfaces are intended to be used with lambdas-with-receivers.
+ * The functions they provide are available inside the blocks passed to this
+ * module.  We are specifying the words available in our language here.  Their
+ * meaning is specified in the implementation further down.
+ */
 
 interface Noise {
     fun noise(): EKFExpr
@@ -29,6 +51,13 @@ interface Measured {
     operator fun set(expr: EKFExpr, value: Double)
 }
 
+/*
+ * These next three interfaces are the reciever of the lambdas for the init,
+ * time update, and measurement updates, respectively.  In other words, they
+ * specify the language to be used in the ekf {}, predict {}, and measure {}
+ * blocks.
+ */
+
 interface InitEKF: Noise {
     val init: SetVar
 }
@@ -42,6 +71,11 @@ interface MeasureEKF: Noise {
     val state: GetVar
     val measured: Measured
 }
+
+/*
+ * Next, we specify the interface for extracting the current state estimate
+ * out of the estimator.
+ */
 
 interface Mean {
     operator fun get(i: Int): Double
@@ -57,11 +91,19 @@ interface Estimate {
     val variance: Variance
 }
 
+/*
+ * This is the complete interface.
+ */
+
 interface EKF {
     fun predict(model: PredictEKF.() -> Unit)
     fun measure(model: MeasureEKF.() -> Unit)
     val estimate: Estimate
 }
+
+/*
+ * Last, we provide a function that implements the interface.
+ */
 
 fun ekf(init: InitEKF.() -> Unit) = object : EKF {
     val dimension: Int
@@ -86,7 +128,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
         }.init()
 
         /* Now we can use that to allocate our state. */
-        dimension = equations.size
+        dimension = (equations.keys.maxOrNull() ?: -1) + 1
         stateMean = mk.zeros(dimension)
         stateVar = mk.zeros(dimension, dimension)
 
@@ -130,6 +172,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
         val f = mk.d2arrayIndices(dimension, dimension) { i, j ->
             val eqn = equations[i]
             if (eqn == null) {
+                /* By default: new[i] = old[i] */
                 if (i == j) 1.0 else 0.0
             } else {
                 eqn.partials[EKFVar.StateVar(j)] ?: 0.0
@@ -138,7 +181,8 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
         val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
             val eqn = equations[i]
             if (eqn == null) {
-                if (i == j) 1.0 else 0.0
+                /* By default: no additional noise terms */
+                0.0
             } else {
                 eqn.partials[EKFVar.NoiseVar(j)] ?: 0.0
             }
