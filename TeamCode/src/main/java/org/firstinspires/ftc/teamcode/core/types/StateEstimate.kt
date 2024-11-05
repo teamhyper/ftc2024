@@ -4,9 +4,9 @@ data class DriveStateEstimate(
     val xMeters: Double,
     val yMeters: Double,
     val yawRads: Double,
-    val dXMetersPerCycle: Double,
-    val dYMetersPerCycle: Double,
-    val dYawRadsPerCycle: Double,
+    val latMetersPerCycle: Double,
+    val longMetersPerCycle: Double,
+    val rotRadsPerCycle: Double,
 )
 
 data class ClawStateEstimate(

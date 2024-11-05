@@ -1,20 +1,31 @@
 package org.firstinspires.ftc.teamcode.core
 
-import org.firstinspires.ftc.teamcode.core.types.ClawControl
-import org.firstinspires.ftc.teamcode.core.types.ClawMeasurement
+import org.firstinspires.ftc.teamcode.core.math.ekf
+import org.firstinspires.ftc.teamcode.core.math.*
 import org.firstinspires.ftc.teamcode.core.types.ClawStateEstimate
 import org.firstinspires.ftc.teamcode.core.types.Control
-import org.firstinspires.ftc.teamcode.core.types.DriveControl
-import org.firstinspires.ftc.teamcode.core.types.DriveMeasurement
 import org.firstinspires.ftc.teamcode.core.types.DriveStateEstimate
 import org.firstinspires.ftc.teamcode.core.types.Measurement
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
+import kotlin.math.PI
+
+/*
+ * This file implements a state estimator.  Its job is to maintain an estimate
+ * of the current state (position, velocity, heading, position of attachments,
+ * etc.) of the robot.  There are two ways an update can be requested:
+ *
+ * 1. New data from sensors is available.  We compare the measured value with
+ *    the expected value, and make a correction to our estimate.
+ *
+ * 2. The control cycle is ending and we are about to sleep.  We update the
+ *    state estimate to the predicted state of the robot after the sleep.
+ */
 
 interface StateEstimator {
     /**
      * Update the state estimate based on new measurements.
      */
-    fun update(measurement: Measurement)
+    fun measure(measurement: Measurement)
 
     /**
      * Predict the future state for the next time step.
@@ -27,252 +38,113 @@ interface StateEstimator {
     val estimate: StateEstimate
 }
 
+/*
+ * Now we build a model of the robot's dynamics.  Each constant names a state
+ * variable.  Its value is an index into a vector/matrix.
+ */
+private const val S_X = 0
+private const val S_Y = 1
+private const val S_YAW = 2
+private const val S_VLAT = 3
+private const val S_VLONG = 4
+private const val S_VROT = 5
+private const val S_ENC1 = 6
+private const val S_ENC2 = 7
+private const val S_ENC3 = 8
+
+/*
+ * When we start the robot up, we need to know what these values are.
+ */
 data class InitialConditions(
     val xMeters: Double,
     val yMeters: Double,
     val yawRads: Double,
+    val enc1Meters: Double,
+    val enc2Meters: Double,
+    val enc3Meters: Double,
 )
 
-fun stateEstimator(initial: InitialConditions): StateEstimator
-        = StateEstimatorImpl(initial)
+/* This function returns a new state estimator based on initial conditions. */
+fun stateEstimator(initial: InitialConditions) = object : StateEstimator {
+    val estimator = ekf {
+        /* 5cm standard deviation in initial placement */
+        init[S_X] = initial.xMeters + 0.05 * noise()
+        init[S_Y] = initial.yMeters + 0.05 * noise()
+        /* 10 degree standard deviation in initial heading */
+        init[S_YAW] = initial.yawRads + 10.0 / 180.0 * PI * noise()
+        /* Assume we're stationary when we start */
+        init[S_VLAT] = 0.0
+        init[S_VLONG] = 0.0
+        init[S_VROT] = 0.0
+        /* The encoders may not be zero at the start */
+        init[S_ENC1] = initial.enc1Meters
+        init[S_ENC2] = initial.enc2Meters
+        init[S_ENC3] = initial.enc3Meters
+    }
 
-private class StateEstimatorImpl(initial: InitialConditions): StateEstimator {
+    override fun measure(measurement: Measurement) = estimator.measure {
+        measured[state[S_ENC1]] = measurement.drive.encoders.leftMeters
+        measured[state[S_ENC2]] = measurement.drive.encoders.rightMeters
+        measured[state[S_ENC3]] = measurement.drive.encoders.centerMeters
+    }
 
-    /* current drive state estimate */
-    var xMeters = initial.xMeters
-    var yMeters = initial.yMeters
-    var yawRads = initial.yawRads
-    var dXMetersPerCycle = 0.0
-    var dYMetersPerCycle = 0.0
-    var dYawRadsPerCycle = 0.0
-    var leftWheelMeters = 0.0
-    var rightWheelMeters = 0.0
-    var centerWheelMeters = 0.0
+    override fun predict(control: Control) = estimator.predict {
+        /*
+         * Integrate the current velocity estimate to get the new position
+         * estimate. See [1], section 10.2, for an explanation.
+         *
+         * [1]: https://file.tavsys.net/control/controls-engineering-in-frc.pdf
+         */
+        val a = 1.0 - old[S_VROT] * old[S_VROT] / 6.0
+        val b = old[S_VROT] / 2.0
+        val u = a * old[S_VLAT] - b * old[S_VLONG]
+        val v = b * old[S_VLAT] + a * old[S_VLONG]
+        new[S_X] = old[S_X] + cos(old[S_YAW]) * u - sin(old[S_YAW]) * v
+        new[S_Y] = old[S_Y] + sin(old[S_YAW]) * u + cos(old[S_YAW]) * v
+        new[S_YAW] = old[S_YAW] + old[S_VROT]
 
-    /* Current estimate of the claw height, relative to home. */
-    var clawHeightMeters = 0.0
-    /* Current estimate of the home position, relative to encoder 0. */
-    var clawHomeMeters = 0.0
+        /*
+         * Integrate the forces on the robot to predict the new velocity.  Also
+         * take account for the rotating reference frame.
+         */
+        val aLat = 0.0
+        val aLong = 0.0
+        val aRot = 0.0
+        val qLat = 0.0
+        val qLong = 0.0
+        val qRot = 0.0
+        new[S_VLAT] = old[S_VLAT] - old[S_VROT] * old[S_VLONG] + aLat + qLat
+        new[S_VLONG] = old[S_VLONG] + old[S_VROT] * old[S_VLAT] + aLong + qLong
+        new[S_VROT] = old[S_VROT] + aRot + qRot
 
-    /* estimate as viewed from outside */
-    override val estimate: StateEstimate
-        get() = StateEstimate(
+        /*
+         * Integrate the encoder counts.  This computes the expected value of
+         * the encoders on the next time step.
+         */
+        val q1 = 0.0
+        val q2 = 0.0
+        val q3 = 0.0
+        val r1 = 0.0 // TODO these need to be real values
+        val r2 = 0.0
+        val r3 = 0.0
+        new[S_ENC1] = old[S_ENC1] + old[S_VLONG] + r1 * old[S_VROT] + q1
+        new[S_ENC2] = old[S_ENC2] + old[S_VLONG] + r2 * old[S_VROT] + q2
+        new[S_ENC3] = old[S_ENC3] + old[S_VLAT] + r3 * old[S_VROT] + q3
+    }
+
+    override val estimate get() = with(estimator.estimate) {
+        StateEstimate(
             drive = DriveStateEstimate(
-                xMeters = xMeters,
-                yMeters = yMeters,
-                yawRads = yawRads,
-                dXMetersPerCycle = dXMetersPerCycle,
-                dYMetersPerCycle = dYMetersPerCycle,
-                dYawRadsPerCycle = dYawRadsPerCycle,
+                xMeters = mean[S_X],
+                yMeters = mean[S_Y],
+                yawRads = mean[S_YAW],
+                latMetersPerCycle = mean[S_VLAT],
+                longMetersPerCycle = mean[S_VLONG],
+                rotRadsPerCycle = mean[S_VROT],
             ),
             claw = ClawStateEstimate(
-                heightMeters = clawHeightMeters
+                heightMeters = 0.0 // TODO implement this for real
             )
         )
-
-    fun updateClaw(measurement: ClawMeasurement) {
-        if (measurement.isHome) {
-            clawHomeMeters = measurement.heightMeters
-        }
-        clawHeightMeters = measurement.heightMeters - clawHomeMeters
-    }
-
-    fun predictClaw(control: ClawControl) {
-        /* No-op for now. */
-    }
-
-    fun updateDrive(measurement: DriveMeasurement) {
-        TODO("not implemented")
-        /*
-         * Predict the value of each measurement.  Our model is that the robot
-         * moves with constant velocity, and any deviation from that is noise.
-         *
-         * We're working in the group SE(2):
-         * [ R R X ]
-         * [ R R Y ]
-         * [ 0 0 1 ]
-         *
-         * This acts on R^3 by multiplication.
-         *
-         * Translation by a fixed velocity is
-         *
-         * [ 1 0 (vx * t) ] [ x ]   [ x + vx * t ]
-         * [ 0 1 (vy * t) ] [ y ] = [ y + vy * t ]
-         * [ 0 0 1        ] [ 1 ]   [ 1          ]
-         *
-         * At 0 this has derivative
-         *
-         * [ 0 0 vx ]
-         * [ 0 0 vy ]
-         * [ 0 0 0  ]
-         *
-         * If I square it, I get 0.  Thus
-         *
-         * e^(At) = 1 + A * t = [ 1 0 vx * t ]
-         *                      [ 0 1 vy * t ]
-         *                      [ 0 0 1      ]
-         *
-         * Rotation by a fixed velocity is
-         *
-         * [ cos(omega*t) -sin(omega*t) 0 ]
-         * [ sin(omega*t)  cos(omega*t) 0 ]
-         * [ 0             0            1 ]
-         *
-         * At 0 this has derivative
-         *
-         *     [ 0 -1 0 ]
-         * B = [ 1  0 0 ]
-         *     [ 0  0 0 ]
-         *
-         *       [ -1 0 0 ]
-         * B^2 = [ 0 -1 0 ] = -P
-         *       [ 0  0 0 ]
-         *
-         *
-         * This behaves a lot like sqrt(-1):
-         *
-         * e^(Bt) = 1 + (Bt) + (Bt)^2/2 + ... + (Bt)^i/i!
-         *        = 1 + Bt - P t^2/2 + -PB t^3/6 + ...
-         *        = (1 - P) + B * P * sum_i [(-1)^i*t^(2i+1)/(2i+1)!]
-         *                  +     P   sum_i [(-1)^i*t(2i)/(2i)!]
-         *        = (1 - P) + (B * sin(t) + P * cos(t))
-         *          [ cos(t) -sin(t) 0 ]
-         *          [ sin(t) cos(t)  0 ]
-         *          [ 0      0       1 ]
-         *
-         * X = [0 0 1]
-         *     [0 0 0]
-         *     [0 0 0]
-         *
-         * Y = [0 0 0]
-         *     [0 0 1]
-         *     [0 0 0]
-         *
-         * R = [0 -1 0]
-         *     [1  0 0]
-         *     [0  0 0]
-         * [X,Y] = 0
-         * [R,X] = Y
-         * [R,Y] = -X
-         *
-         * How does this affect the encoders?
-         * And how do we design a state estimator?
-         *
-         * Our current pose is an element of SE(2), translating from robot to
-         * field coords.
-         * Our current velocity is vx, vy, omega.
-         * Our current encoder readings are e1, e2, e3.
-         *
-         * Driving forwards changes the pose by g -> g * e^(Yt)
-         * Driving right changes the pose by    g -> g * e^(Xt)
-         * Driving CCW changes the pose by      g -> g * e^(Rt)
-         * Driving in the global X direction:   g -> e^(Xt) * g
-         * Driving in the global Y direction:   g -> e^(Yt) * g
-         *
-         * We want to represent the pose as a composition
-         *  g = e^(Xa)e^(Yb)e^(Rc)
-         *
-         * X and Y commute, so we can equivalently say:
-         *  g = e^(Xa+Yb)*e^(Rc)
-         *
-         * Our model is that on each timestep, the velocity changes to an
-         * unknown constant (in field-relative coords), with that constant
-         * having some uncertainty.  We'll assume each component of velocity is
-         * independent for now.
-         *
-         * The nominal new pose is then
-         * g -> e^((X*vx + Y*vy)*t) * g * e^(R*omega*t)
-         *
-         * How do I phrase this in terms of diffeqs?
-         * g' should be a vector in the tangent space of SE(2), i.e. an element
-         * of the lie algebra.  But are we multiplying on the left or the right?
-         * Maybe multiply everything on the right, so we are working robot-
-         * relative.  In that case, the (robot-relative) velocity also changes
-         * as we rotate.
-         *
-         * rvx(t) = rvx(0) * cos(omega*t) - rvy(0) * sin(omega*t)
-         * rvy(t) = rvx(0) * sin(omega*t) + rvy(0) * cos(omega*t)
-         *
-         * so
-         *
-         * rvx'    = -omega * rvy
-         * rvy'    = omega * rvx
-         * omega'  = 0
-         * pose'   = X * rvx + Y * rvy + R * omega
-         * enc[i]' = (linear function of rvx, rvy, omega)
-         *
-         * So the time-update equations (euler integration) are
-         *
-         * velocity on the interval (k, k+1):
-         *
-         * rvx[k]   =              rvx[k-1] - omega[k-1] * rvy[k-1] + noise
-         * rvy[k]   = omega[k-1] * rvx[k-1] +              rvy[k-1] + noise
-         * omega[k] = omega[k-1]                                    + noise
-         *
-         * position at time k:
-         *
-         * pose[k]  = pose[k-1] * exp(X*rvx[k-1]+Y*rvy[k-1]+R*omega[k-1])
-         * enc[i,k] = enc[i,k-1] + (zsomething with rvx[k-1],rvy[k-1],omega[k-1])
-         *
-         * That matrix exponential is:
-         *     [0     -omega rvx]
-         * exp [omega  0     rvy]
-         *     [0      0     0  ]
-         *
-         * so
-         *          [cos(omega*t) | -sin(omega*t) | vx*sin(omega*t)/omega + vy*(cos(omega*t)-1)/omega]
-         * e^(tA) = [sin(omega*t) | cos(omega*t)  | vx*(1-cos(omega*t))/omega + vy*sin(omega*t)/omega]
-         *          [0            | 0             | 1                                                ]
-         *
-         * This matches the formulas online!
-         *
-         * Let ux, uy be the displacement values in the above matrix.
-         *
-         * x[k] = x[k-1] + cos(theta[k-1]) * ux[k-1] - sin(theta[k-1]) * uy[k-1]
-         * y[k] = y[k-1] + sin(theta[k-1]) * ux[k-1] + cos(theta[k-1]) * uy[k-1]
-         * theta[k] = theta[k-1] + omega[k-1]
-         *
-         * What's left? encoders and *covariance matrix*.
-         * Assume encoder measurements have 0 variance, all uncertainty is from process.
-         *
-         * So we find an error for enc[i,k].  We pull this back into an error for
-         * rvx[k-1],rvy[k-1],omega[k-1], and then push that forwards to an error
-         * for (x[k],y[k],theta[k],rvx[k],rvy[k],omega[k]).  Then we correct the
-         * state according to that error.
-         *
-         * What is the Kalman gain matrix?
-         */
-
-
-        xMeters += dXMetersPerCycle
-        yMeters += dYMetersPerCycle
-        yawRads += dYawRadsPerCycle
-
-
-        /* Compare predictions with actual values to compute error. */
-        /* Use the errors to correct our estimate. */
-    }
-
-    fun predictDrive(control: DriveControl) {
-        /*
-         * For now, we don't take the control signal into account at all, and
-         * instead we just assume that the robot will always move with constant
-         * velocity (as if the motors were set to coast and there was no
-         * friction).  We'll replace this with a better model after we gather
-         * some data.
-         */
-        xMeters += dXMetersPerCycle
-        yMeters += dYMetersPerCycle
-        yawRads += dYawRadsPerCycle
-    }
-
-    override fun update(measurement: Measurement) {
-        updateClaw(measurement.claw)
-        updateDrive(measurement.drive)
-    }
-
-    override fun predict(control: Control) {
-        predictClaw(control.claw)
-        predictDrive(control.drive)
     }
 }
