@@ -71,6 +71,15 @@ operator fun<T> Expr<T>.div(e: Expr<T>) = Expr(
     }
 )
 
+operator fun<T> Expr<T>.plus(e: Double) = this + constant(e)
+operator fun<T> Double.plus(e: Expr<T>) = constant<T>(this) + e
+operator fun<T> Expr<T>.minus(e: Double) = this - constant(e)
+operator fun<T> Double.minus(e: Expr<T>) = constant<T>(this) - e
+operator fun<T> Expr<T>.times(e: Double) = this * constant(e)
+operator fun<T> Double.times(e: Expr<T>) = constant<T>(this) * e
+operator fun<T> Expr<T>.div(e: Double) = this / constant(e)
+operator fun<T> Double.div(e: Expr<T>) = constant<T>(this) / e
+
 fun<T> exp(e: Expr<T>) = Expr(
     nominal = exp(e.nominal),
     partials = e.partials.mapValues { it.value * exp(e.nominal) }

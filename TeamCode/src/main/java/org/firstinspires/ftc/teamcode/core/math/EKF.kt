@@ -18,6 +18,7 @@ interface Noise {
 
 interface SetVar {
     operator fun set(i: Int, expr: EKFExpr)
+    operator fun set(i: Int, expr: Double) = set(i, constant(expr))
 }
 
 interface GetVar {
