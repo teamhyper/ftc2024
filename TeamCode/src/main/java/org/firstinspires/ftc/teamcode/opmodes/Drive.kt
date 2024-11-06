@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.util.ElapsedTime
 import org.firstinspires.ftc.teamcode.core.CYCLE_PERIOD_SECONDS
 import org.firstinspires.ftc.teamcode.core.InitialConditions
 import org.firstinspires.ftc.teamcode.core.hardware
+import org.firstinspires.ftc.teamcode.core.logger
 import org.firstinspires.ftc.teamcode.core.stateEstimator
 import org.firstinspires.ftc.teamcode.core.types.ClawControl
 import org.firstinspires.ftc.teamcode.core.types.Control
@@ -26,6 +27,7 @@ class Drive : LinearOpMode() {
         )
         val stateEstimator = stateEstimator(initialConditions)
         val cycleTimer = ElapsedTime()
+        val logger = logger()
 
         waitForStart()
         while (opModeIsActive()) {
@@ -34,9 +36,12 @@ class Drive : LinearOpMode() {
 
             /* Measure inputs from all sensors. */
             val meas = hw.measure()
+            logger.log(meas)
 
             /* Update the state estimate based on sensors. */
             stateEstimator.measure(meas)
+            val state = stateEstimator.estimate
+            logger.log(state)
 
             /* Calculate control signal. */
             val driveCtl = DriveControl(
@@ -52,6 +57,7 @@ class Drive : LinearOpMode() {
 
             /* Send control signal to actuators. */
             hw.control(robotCtl)
+            logger.log(robotCtl)
 
             /* Predict the future state for the next cycle. */
             stateEstimator.predict(robotCtl)
