@@ -51,6 +51,10 @@ private const val S_VROT = 5
 private const val S_ENC1 = 6
 private const val S_ENC2 = 7
 private const val S_ENC3 = 8
+private const val S_LIFT_X = 9
+private const val S_LIFT_V = 10
+private const val S_LIFT_ENC1 = 11
+private const val S_LIFT_ENC2 = 12
 
 /*
  * When we start the robot up, we need to know what these values are.
@@ -59,9 +63,6 @@ data class InitialConditions(
     val xMeters: Double,
     val yMeters: Double,
     val yawRads: Double,
-    val enc1Meters: Double,
-    val enc2Meters: Double,
-    val enc3Meters: Double,
 )
 
 /* This function returns a new state estimator based on initial conditions. */
@@ -72,20 +73,50 @@ fun stateEstimator(initial: InitialConditions) = object : StateEstimator {
         init[S_Y] = initial.yMeters + 0.05 * noise()
         /* 10 degree standard deviation in initial heading */
         init[S_YAW] = initial.yawRads + 10.0 / 180.0 * PI * noise()
-        /* Assume we're stationary when we start */
-        init[S_VLAT] = 0.0
-        init[S_VLONG] = 0.0
-        init[S_VROT] = 0.0
-        /* The encoders may not be zero at the start */
-        init[S_ENC1] = initial.enc1Meters
-        init[S_ENC2] = initial.enc2Meters
-        init[S_ENC3] = initial.enc3Meters
+        /* For everything else, it's "don't know". */
+        init[S_VLAT] = noise()
+        init[S_VLONG] = noise()
+        init[S_VROT] = noise()
+        init[S_ENC1] = noise()
+        init[S_ENC2] = noise()
+        init[S_ENC3] = noise()
+        init[S_LIFT_X] = noise()
+        init[S_LIFT_V] = noise()
+        init[S_LIFT_ENC1] = noise()
+        init[S_LIFT_ENC2] = noise()
     }
 
     override fun measure(measurement: Measurement) = estimator.measure {
-        measured[state[S_ENC1]] = measurement.drive.encoders.leftMeters
-        measured[state[S_ENC2]] = measurement.drive.encoders.rightMeters
-        measured[state[S_ENC3]] = measurement.drive.encoders.centerMeters
+        /*
+         * Measure drive encoders.  We measure the state variable almost
+         * directly.  The difference comes from quantization noise, which I
+         * roughly estimate is on the order of 10^-4 meters.
+         */
+        val q1 = 1e-4 * noise()
+        val q2 = 1e-4 * noise()
+        val q3 = 1e-4 * noise()
+        val encoders = measurement.drive.encoders
+        measured[state[S_ENC1] + q1] = encoders.leftMeters
+        measured[state[S_ENC2] + q2] = encoders.rightMeters
+        measured[state[S_ENC3] + q3] = encoders.centerMeters
+
+        /*
+         * Measure the lift position.  The same comments about quantization
+         * noise apply here.
+         */
+        val q4 = 1e-4 * noise()
+        val q5 = 1e-4 * noise()
+        measured[state[S_LIFT_ENC1] + q4] = measurement.claw.heightMeters
+        measured[state[S_LIFT_ENC2] + q5] = measurement.claw.heightMeters
+
+        /*
+         * If the lift home switch is pressed, we know we are within ~1mm of the
+         * home position.
+         */
+        if (measurement.claw.isHome) {
+            val q6 = 1e-3 * noise()
+            measured[state[S_LIFT_X] + q6] = 0.0
+        }
     }
 
     override fun predict(control: Control) = estimator.predict {
@@ -107,29 +138,36 @@ fun stateEstimator(initial: InitialConditions) = object : StateEstimator {
          * Integrate the forces on the robot to predict the new velocity.  Also
          * take account for the rotating reference frame.
          */
-        val aLat = 0.0
-        val aLong = 0.0
-        val aRot = 0.0
-        val qLat = 0.0
-        val qLong = 0.0
-        val qRot = 0.0
-        new[S_VLAT] = old[S_VLAT] - old[S_VROT] * old[S_VLONG] + aLat + qLat
-        new[S_VLONG] = old[S_VLONG] + old[S_VROT] * old[S_VLAT] + aLong + qLong
-        new[S_VROT] = old[S_VROT] + aRot + qRot
+        val aLat = 0.0 + 0.0 * noise()
+        val aLong = 0.0 + 0.0 * noise()
+        val aRot = 0.0 + 0.0 * noise()
+        new[S_VLAT] = old[S_VLAT] - old[S_VROT] * old[S_VLONG] + aLat
+        new[S_VLONG] = old[S_VLONG] + old[S_VROT] * old[S_VLAT] + aLong
+        new[S_VROT] = old[S_VROT] + aRot
 
-        /*
-         * Integrate the encoder counts.  This computes the expected value of
-         * the encoders on the next time step.
-         */
-        val q1 = 0.0
-        val q2 = 0.0
-        val q3 = 0.0
+        /* Integrate the drive encoder counts. */
+        val slip1 = 0.0 * noise()
+        val slip2 = 0.0 * noise()
+        val slip3 = 0.0 * noise()
         val r1 = 0.0 // TODO these need to be real values
         val r2 = 0.0
         val r3 = 0.0
-        new[S_ENC1] = old[S_ENC1] + old[S_VLONG] + r1 * old[S_VROT] + q1
-        new[S_ENC2] = old[S_ENC2] + old[S_VLONG] + r2 * old[S_VROT] + q2
-        new[S_ENC3] = old[S_ENC3] + old[S_VLAT] + r3 * old[S_VROT] + q3
+        new[S_ENC1] = old[S_ENC1] + old[S_VLONG] + r1 * old[S_VROT] + slip1
+        new[S_ENC2] = old[S_ENC2] + old[S_VLONG] + r2 * old[S_VROT] + slip2
+        new[S_ENC3] = old[S_ENC3] + old[S_VLAT] + r3 * old[S_VROT] + slip3
+
+        /* Integrate claw velocity to find position. */
+        new[S_LIFT_X] = old[S_LIFT_X] + old[S_LIFT_V]
+
+        /* Integrate forces on lifter. */
+        val aLift = 0.0 + 0.0 * noise()
+        new[S_LIFT_V] = old[S_LIFT_V] + aLift
+
+        /* Integrate lifter encoder counts. */
+        val slip4 = 0.0 * noise()
+        val slip5 = 0.0 * noise()
+        new[S_LIFT_ENC1] = old[S_LIFT_ENC1] + old[S_LIFT_V] + slip4
+        new[S_LIFT_ENC2] = old[S_LIFT_ENC2] + old[S_LIFT_V] + slip5
     }
 
     override val estimate get() = with(estimator.estimate) {
@@ -143,7 +181,7 @@ fun stateEstimator(initial: InitialConditions) = object : StateEstimator {
                 rotRadsPerCycle = mean[S_VROT],
             ),
             claw = ClawStateEstimate(
-                heightMeters = 0.0 // TODO implement this for real
+                heightMeters = mean[S_LIFT_X],
             )
         )
     }
