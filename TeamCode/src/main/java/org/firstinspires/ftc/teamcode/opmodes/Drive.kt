@@ -45,7 +45,7 @@ class Drive : LinearOpMode() {
                 rotationPower = -gamepad1.right_stick_x.toDouble(),
             )
             val clawCtl = ClawControl(
-                liftPower = 0.0,
+                liftPower = (gamepad1.left_trigger - gamepad1.right_trigger).toDouble(),
                 clawAngleRads = 0.0,
             )
             val robotCtl = Control(driveCtl, clawCtl)
