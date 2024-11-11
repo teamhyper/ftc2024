@@ -7,10 +7,6 @@
  * map.  It returns a `Hardware` object.  During each cycle, call `measure()`
  * to read data from all sensors, and `control()` to send a signal to all
  * actuators.
- *
- * Not much processing logic is done here, besides unit conversions and
- * normalization (e.g. if a motor only accepts inputs in the range [0, 1], but
- * your program sends 1.5, it is clamped down to 1).
  */
 
 package org.firstinspires.ftc.teamcode.core
@@ -24,22 +20,18 @@ import com.qualcomm.robotcore.hardware.IMU
 import com.qualcomm.robotcore.hardware.Servo
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
+import org.firstinspires.ftc.teamcode.core.ext.getAllHubs
+import org.firstinspires.ftc.teamcode.core.ext.getCamera
+import org.firstinspires.ftc.teamcode.core.ext.getIMU
+import org.firstinspires.ftc.teamcode.core.ext.getMotor
+import org.firstinspires.ftc.teamcode.core.ext.getServo
+import org.firstinspires.ftc.teamcode.core.ext.getTouchSensor
 import org.firstinspires.ftc.teamcode.core.types.AprilTagMeasurement
-import org.firstinspires.ftc.teamcode.core.types.ClawCameraMeasurement
-import org.firstinspires.ftc.teamcode.core.types.ClawControl
-import org.firstinspires.ftc.teamcode.core.types.ClawMeasurement
 import org.firstinspires.ftc.teamcode.core.types.Control
-import org.firstinspires.ftc.teamcode.core.types.DriveCameraMeasurement
-import org.firstinspires.ftc.teamcode.core.types.DriveControl
-import org.firstinspires.ftc.teamcode.core.types.DriveEncoderMeasurement
-import org.firstinspires.ftc.teamcode.core.types.DriveMeasurement
-import org.firstinspires.ftc.teamcode.core.types.IMUMeasurement
 import org.firstinspires.ftc.teamcode.core.types.Measurement
 import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
-import kotlin.math.abs
-import kotlin.math.min
 
 /*
  * The interface that hardware presents to the rest of the control logic.
@@ -54,9 +46,7 @@ interface Hardware {
  * called during initialization.  The rest of this file is just the definition
  * of HardwareImpl.
  */
-fun hardware(hw: HardwareMap): Hardware = HardwareImpl(hw)
-
-private class HardwareImpl(hw: HardwareMap) : Hardware {
+fun hardware(hw: HardwareMap) = object : Hardware {
     /*
      * Drive motors.  These are RUN_WITHOUT_ENCODER because our program produces
      * the power signal, not the position signal.  We use the encoders on the
@@ -82,22 +72,48 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-
     /*
      * The encoders on the dead wheels are plugged into the motor encoder
-     * ports.
+     * ports, so we define aliases here.
      */
     val leftDriveEncoder = frontLeftDriveMotor
     val rightDriveEncoder = frontRightDriveMotor
     val centerDriveEncoder = backRightDriveMotor
 
+    /*
+     * Lifter/arm/claw hardware. Again we use run_without_encoder since we
+     * have two motors stuck together, and we want to make sure they don't run
+     * against each other by always feeding them the same power signal.
+     */
+    val leftLiftMotor = hw.getMotor("lift_left").apply {
+        mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        direction = DcMotorSimple.Direction.FORWARD
+        zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+    }
+    val rightLiftMotor = hw.getMotor("lift_right").apply {
+        mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        direction = DcMotorSimple.Direction.REVERSE
+        zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+    }
+    val liftLimit = hw.getTouchSensor("lift_limit")
+    val armMotor = hw.getMotor("arm").apply {
+        mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        direction = DcMotorSimple.Direction.FORWARD
+        zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+    }
+    val clawTwistServo = hw.getServo("claw_twist").apply {
+        direction = Servo.Direction.FORWARD
+    }
+    val clawGripServo = hw.getServo("claw_grip").apply {
+        direction = Servo.Direction.FORWARD
+    }
+
     /* The IMU is additionally used by the drivetrain for state estimation. */
     val imu = hw.getIMU("imu").apply {
-        val orientation = RevHubOrientationOnRobot(
+        initialize(IMU.Parameters(RevHubOrientationOnRobot(
             RevHubOrientationOnRobot.LogoFacingDirection.FORWARD,
             RevHubOrientationOnRobot.UsbFacingDirection.LEFT,
-        )
-        initialize(IMU.Parameters(orientation))
+        )))
         resetYaw()
     }
 
@@ -106,7 +122,7 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
         .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
         .setTagLibrary(AprilTagGameDatabase.getIntoTheDeepTagLibrary())
         .setDrawCubeProjection(true)
-        .setCameraPose(driveCameraPosition(), driveCameraOrientation())
+        .setCameraPose(driveCameraPosition, driveCameraOrientation)
         .setOutputUnits(DistanceUnit.METER, AngleUnit.RADIANS)
         .build()
     init {
@@ -117,113 +133,53 @@ private class HardwareImpl(hw: HardwareMap) : Hardware {
             .build()
     }
 
-    /* Claw hardware.  MAKE SURE to set the direction right before running! */
-    val leftClawLiftMotor = hw.getMotor("claw_lift_left").apply {
-        mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
-        direction = DcMotorSimple.Direction.FORWARD
-        zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-    }
-    val rightClawLiftMotor = hw.getMotor("claw_lift_right").apply {
-        mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
-        direction = DcMotorSimple.Direction.FORWARD
-        zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-    }
-    val clawLiftLimit = hw.getTouchSensor("claw_lift_limit")
-    val clawGripServo = hw.getServo("claw_grip").apply {
-        direction = Servo.Direction.FORWARD
-        scaleRange(CLAW_GRIP_MIN_POSITION, CLAW_GRIP_MAX_POSITION)
-    }
-
     /*
      * Set all control hubs to use MANUAL mode.  This improves performance, but
-     * means that the cache must manually be cleared on each iteration.  See
-     * ConceptMotorBulkRead.
+     * means that the cache must manually be cleared on each iteration.  We do
+     * this in our `measure()` override.
      */
     val controlHubs = hw.getAllHubs().onEach {
         it.bulkCachingMode = LynxModule.BulkCachingMode.MANUAL
     }
 
-    /* Called at the start of each control cycle. */
-    fun clearCache() {
+    /*
+     * Called at the start of each control cycle.  Read data from all sensors.
+     */
+    override fun measure(): Measurement {
+        /* Update the bulk cache so we read new values. */
         controlHubs.forEach { it.clearBulkCache() }
-    }
-
-    fun measureDriveEncoders() = DriveEncoderMeasurement(
-        leftMeters = leftDriveEncoder.currentPosition * ODOMETRY_METERS_PER_TICK,
-        rightMeters = rightDriveEncoder.currentPosition * ODOMETRY_METERS_PER_TICK,
-        centerMeters = centerDriveEncoder.currentPosition * ODOMETRY_METERS_PER_TICK,
-    )
-
-    fun measureIMU() = IMUMeasurement(
-        yawRads = imu.robotYawPitchRollAngles.getYaw(AngleUnit.RADIANS)
-    )
-
-    fun measureDriveCamera() = DriveCameraMeasurement(
-        aprilTags = driveAprilTagProcessor.freshDetections
-            ?.map {
+        return Measurement(
+            leftDriveEncTicks = leftDriveEncoder.currentPosition.toDouble(),
+            rightDriveEncTicks = rightDriveEncoder.currentPosition.toDouble(),
+            centerDriveEncTicks = centerDriveEncoder.currentPosition.toDouble(),
+            leftLiftEncTicks = leftLiftMotor.currentPosition.toDouble(),
+            rightLiftEncTicks = rightLiftMotor.currentPosition.toDouble(),
+            liftIsHome = liftLimit.isPressed,
+            imuYawRads = imu.robotYawPitchRollAngles.getYaw(AngleUnit.RADIANS),
+            aprilTags = driveAprilTagProcessor.freshDetections?.map {
                 AprilTagMeasurement(
                     id = it.id,
                     xMeters = it.ftcPose.x,
                     yMeters = it.ftcPose.y,
                     zMeters = it.ftcPose.z,
                 )
-            }
-            ?: emptyList()
-    )
-
-    fun measureDrive() = DriveMeasurement(
-        measureDriveEncoders(),
-        measureIMU(),
-        measureDriveCamera(),
-    )
-
-    fun measureClawCamera() = ClawCameraMeasurement(todo = Unit)
-
-    fun measureClaw() = ClawMeasurement(
-            heightMeters = CLAW_LIFT_METERS_PER_TICK * 0.5 * (
-                    rightClawLiftMotor.currentPosition +
-                    leftClawLiftMotor.currentPosition
-                    ),
-            isHome = clawLiftLimit.isPressed,
-            camera = measureClawCamera(),
+            } ?: emptyList(),
+            armEncTicks = armMotor.currentPosition.toDouble(),
         )
-
-    /*
-     * Called at the start of each control cycle.  Read data from all sensors.
-     */
-    override fun measure(): Measurement {
-        clearCache()
-        return Measurement(
-            measureDrive(),
-            measureClaw(),
-        )
-    }
-
-    fun controlDrive(ctl: DriveControl) {
-        val norm = abs(ctl.latitudePower) + abs(ctl.longitudePower) +
-                abs(ctl.rotationPower)
-        val scale = min(1.0, 1.0 / norm)
-        frontLeftDriveMotor.power =
-            scale * (ctl.longitudePower + ctl.latitudePower - ctl.rotationPower)
-        frontRightDriveMotor.power =
-            scale * (ctl.longitudePower - ctl.latitudePower + ctl.rotationPower)
-        backLeftDriveMotor.power =
-            scale * (ctl.longitudePower - ctl.latitudePower - ctl.rotationPower)
-        backRightDriveMotor.power =
-            scale * (ctl.longitudePower + ctl.latitudePower + ctl.rotationPower)
-    }
-
-    fun controlClaw(ctl: ClawControl) {
-        leftClawLiftMotor.power = ctl.liftPower
-        rightClawLiftMotor.power = ctl.liftPower
-        clawGripServo.position = ctl.clawAngleRads / CLAW_GRIP_MAX_ANGLE_RADS
     }
 
     /*
      * Called later during each control cycle.  Write all data to actuators.
      */
     override fun control(ctl: Control) {
-        controlDrive(ctl.drive)
-        controlClaw(ctl.claw)
+        frontLeftDriveMotor.power = ctl.frontLeftDrivePower
+        frontRightDriveMotor.power = ctl.frontRightDrivePower
+        backLeftDriveMotor.power = ctl.backLeftDrivePower
+        backRightDriveMotor.power = ctl.backRightDrivePower
+        leftLiftMotor.power = ctl.liftPower
+        rightLiftMotor.power = ctl.liftPower
+        armMotor.power = ctl.armPower
+        clawTwistServo.position = ctl.clawTwistDutyCycle
+        clawGripServo.position = ctl.clawGripDutyCycle
     }
 }

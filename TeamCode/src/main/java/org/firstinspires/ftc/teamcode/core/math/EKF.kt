@@ -187,7 +187,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
                 eqn.partials[EKFVar.NoiseVar(j)] ?: 0.0
             }
         }
-        stateVar = f dot stateVar dot f.transpose() + l dot l.transpose()
+        stateVar = (f dot stateVar dot f.transpose()) + (l dot l.transpose())
     }
 
     override fun measure(model: MeasureEKF.() -> Unit) {
@@ -225,8 +225,9 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
         /* Perform the measurement update. */
         val v = (h dot stateVar dot h.transpose()) + (m dot m.transpose())
         val k = stateVar dot h.transpose() dot mk.linalg.inv(v)
+        val l = mk.identity<Double>(dimension) - (k dot h)
         stateMean = stateMean + (k dot e)
-        stateVar = (mk.identity<Double>(dimension) - (k dot h)) dot stateVar
+        stateVar = (l dot stateVar dot l.transpose()) + (k dot k.transpose())
     }
 
     override val estimate = object : Estimate {

@@ -2,9 +2,7 @@ package org.firstinspires.ftc.teamcode.core
 
 import org.firstinspires.ftc.teamcode.core.math.ekf
 import org.firstinspires.ftc.teamcode.core.math.*
-import org.firstinspires.ftc.teamcode.core.types.ClawStateEstimate
 import org.firstinspires.ftc.teamcode.core.types.Control
-import org.firstinspires.ftc.teamcode.core.types.DriveStateEstimate
 import org.firstinspires.ftc.teamcode.core.types.Measurement
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
 import kotlin.math.PI
@@ -40,82 +38,93 @@ interface StateEstimator {
 
 /*
  * Now we build a model of the robot's dynamics.  Each constant names a state
- * variable.  Its value is an index into a vector/matrix.
+ * variable.  Its value is an index into a vector/matrix.  We start with the
+ * position and velocity of the robot and its mechanisms.
  */
-private const val S_X = 0
-private const val S_Y = 1
-private const val S_YAW = 2
-private const val S_VLAT = 3
-private const val S_VLONG = 4
-private const val S_VROT = 5
-private const val S_ENC1 = 6
-private const val S_ENC2 = 7
-private const val S_ENC3 = 8
-private const val S_LIFT_X = 9
-private const val S_LIFT_V = 10
-private const val S_LIFT_ENC1 = 11
-private const val S_LIFT_ENC2 = 12
+
+private enum class S {
+    X,
+    Y,
+    YAW,
+    LIFT_HEIGHT,
+    ARM_ANGLE,
+
+    LAT_VEL,
+    LONG_VEL,
+    ROT_VEL,
+    LIFT_VEL,
+    ARM_VEL,
+
+    ENC_DRIVE_LEFT,
+    ENC_DRIVE_RIGHT,
+    ENC_DRIVE_CENTER,
+    ENC_LIFT_LEFT,
+    ENC_LIFT_RIGHT,
+    ENC_ARM,
+}
+
+private operator fun GetVar.get(s: S) = get(s.ordinal)
+private operator fun SetVar.set(s: S, e: EKFExpr) = set(s.ordinal, e)
+private operator fun Mean.get(s: S) = get(s.ordinal)
 
 /*
  * When we start the robot up, we need to know what these values are.
  */
 data class InitialConditions(
-    val xMeters: Double,
-    val yMeters: Double,
-    val yawRads: Double,
+    val xMeters: Double = 0.0,
+    val yMeters: Double = 0.0,
+    val yawRads: Double = 0.0,
+    val armRads: Double = 0.0,
 )
 
 /* This function returns a new state estimator based on initial conditions. */
-fun stateEstimator(initial: InitialConditions) = object : StateEstimator {
+fun stateEstimator(
+    initial: InitialConditions = InitialConditions()
+) = object : StateEstimator {
     val estimator = ekf {
-        /* 5cm standard deviation in initial placement */
-        init[S_X] = initial.xMeters + 0.05 * noise()
-        init[S_Y] = initial.yMeters + 0.05 * noise()
+        /* 10cm standard deviation in initial placement */
+        init[S.X] = initial.xMeters + 0.1 * noise()
+        init[S.Y] = initial.yMeters + 0.1 * noise()
         /* 10 degree standard deviation in initial heading */
-        init[S_YAW] = initial.yawRads + 10.0 / 180.0 * PI * noise()
-        /* For everything else, it's "don't know". */
-        init[S_VLAT] = noise()
-        init[S_VLONG] = noise()
-        init[S_VROT] = noise()
-        init[S_ENC1] = noise()
-        init[S_ENC2] = noise()
-        init[S_ENC3] = noise()
-        init[S_LIFT_X] = noise()
-        init[S_LIFT_V] = noise()
-        init[S_LIFT_ENC1] = noise()
-        init[S_LIFT_ENC2] = noise()
+        init[S.YAW] = initial.yawRads + 10.0 / 180.0 * PI * noise()
+        /* Initial height is unknown until we press the homing switch. */
+        init[S.LIFT_HEIGHT] = 0.5 + 1.0 * noise()
+        /* Arm placement is specified known to within 10 degrees. */
+        init[S.ARM_ANGLE] = initial.armRads + 10.0 / 180.0 * PI * noise()
+
+        /* drive train moves initially at <0.01 m/s, <0.01 rad/s */
+        init[S.LAT_VEL] = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        init[S.LONG_VEL] = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        init[S.ROT_VEL] = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        init[S.LIFT_VEL] = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        init[S.ARM_VEL] = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+
+        /*
+         * Initially, we don't know what the count is, so just make the variance
+         * really big.  After a few
+         * A billion should be big enough, since encoder ticks are measured in
+         * 32-bit ints anyway.
+         */
+        init[S.ENC_DRIVE_LEFT] = 1e9 * noise()
+        init[S.ENC_DRIVE_RIGHT] = 1e9 * noise()
+        init[S.ENC_DRIVE_CENTER] = 1e9 * noise()
+        init[S.ENC_LIFT_LEFT] = 1e9 * noise()
+        init[S.ENC_LIFT_RIGHT] = 1e9 * noise()
+        init[S.ENC_ARM] = 1e9 * noise()
     }
 
     override fun measure(measurement: Measurement) = estimator.measure {
-        /*
-         * Measure drive encoders.  We measure the state variable almost
-         * directly.  The difference comes from quantization noise, which I
-         * roughly estimate is on the order of 10^-4 meters.
-         */
-        val q1 = 1e-4 * noise()
-        val q2 = 1e-4 * noise()
-        val q3 = 1e-4 * noise()
-        val encoders = measurement.drive.encoders
-        measured[state[S_ENC1] + q1] = encoders.leftMeters
-        measured[state[S_ENC2] + q2] = encoders.rightMeters
-        measured[state[S_ENC3] + q3] = encoders.centerMeters
+        /* Measure encoders + quantization noise on the order of 1 tick. */
+        measured[state[S.ENC_DRIVE_LEFT] + noise()] = measurement.leftDriveEncTicks
+        measured[state[S.ENC_DRIVE_RIGHT] + noise()] = measurement.rightDriveEncTicks
+        measured[state[S.ENC_DRIVE_CENTER] + noise()] = measurement.centerDriveEncTicks
+        measured[state[S.ENC_LIFT_LEFT] + noise()] = measurement.leftLiftEncTicks
+        measured[state[S.ENC_LIFT_RIGHT] + noise()] = measurement.rightLiftEncTicks
+        measured[state[S.ENC_ARM] + noise()] = measurement.armEncTicks
 
-        /*
-         * Measure the lift position.  The same comments about quantization
-         * noise apply here.
-         */
-        val q4 = 1e-4 * noise()
-        val q5 = 1e-4 * noise()
-        measured[state[S_LIFT_ENC1] + q4] = measurement.claw.heightMeters
-        measured[state[S_LIFT_ENC2] + q5] = measurement.claw.heightMeters
-
-        /*
-         * If the lift home switch is pressed, we know we are within ~1mm of the
-         * home position.
-         */
-        if (measurement.claw.isHome) {
-            val q6 = 1e-3 * noise()
-            measured[state[S_LIFT_X] + q6] = 0.0
+        if (measurement.liftIsHome) {
+            /* We are within ~1mm of the home position. */
+            measured[state[S.LIFT_HEIGHT] + 0.001 * noise()] = 0.0
         }
     }
 
@@ -126,63 +135,72 @@ fun stateEstimator(initial: InitialConditions) = object : StateEstimator {
          *
          * [1]: https://file.tavsys.net/control/controls-engineering-in-frc.pdf
          */
-        val a = 1.0 - old[S_VROT] * old[S_VROT] / 6.0
-        val b = old[S_VROT] / 2.0
-        val u = a * old[S_VLAT] - b * old[S_VLONG]
-        val v = b * old[S_VLAT] + a * old[S_VLONG]
-        new[S_X] = old[S_X] + cos(old[S_YAW]) * u - sin(old[S_YAW]) * v
-        new[S_Y] = old[S_Y] + sin(old[S_YAW]) * u + cos(old[S_YAW]) * v
-        new[S_YAW] = old[S_YAW] + old[S_VROT]
+        val a = 1.0 - old[S.ROT_VEL] * old[S.ROT_VEL] / 6.0
+        val b = old[S.ROT_VEL] / 2.0
+        val u = a * old[S.LAT_VEL] - b * old[S.LONG_VEL]
+        val v = b * old[S.LAT_VEL] + a * old[S.LONG_VEL]
+        new[S.X] = old[S.X] + cos(old[S.YAW]) * u - sin(old[S.YAW]) * v
+        new[S.Y] = old[S.Y] + sin(old[S.YAW]) * u + cos(old[S.YAW]) * v
+        new[S.YAW] = old[S.YAW] + old[S.ROT_VEL]
+        new[S.LIFT_HEIGHT] = old[S.LIFT_HEIGHT] + old[S.LIFT_VEL]
+        new[S.ARM_ANGLE] = old[S.ARM_ANGLE] + old[S.ARM_VEL]
 
         /*
          * Integrate the forces on the robot to predict the new velocity.  Also
-         * take account for the rotating reference frame.
+         * take account for the rotating reference frame.  For now we have only
+         * a very rough model of this.
          */
-        val aLat = 0.0 + 0.0 * noise()
-        val aLong = 0.0 + 0.0 * noise()
-        val aRot = 0.0 + 0.0 * noise()
-        new[S_VLAT] = old[S_VLAT] - old[S_VROT] * old[S_VLONG] + aLat
-        new[S_VLONG] = old[S_VLONG] + old[S_VROT] * old[S_VLAT] + aLong
-        new[S_VROT] = old[S_VROT] + aRot
+        val aLat = 10.0 * CYCLE_PERIOD_SECONDS * noise()
+        val aLong = 10.0 * CYCLE_PERIOD_SECONDS * noise()
+        val aRot = 10.0 * CYCLE_PERIOD_SECONDS * noise()
+        val aLift = 10.0 * CYCLE_PERIOD_SECONDS * noise()
+        val aArm = 10.0 * CYCLE_PERIOD_SECONDS * noise()
+        new[S.LAT_VEL] = old[S.LAT_VEL] - old[S.ROT_VEL] * old[S.LONG_VEL] + aLat
+        new[S.LONG_VEL] = old[S.LONG_VEL] + old[S.ROT_VEL] * old[S.LAT_VEL] + aLong
+        new[S.ROT_VEL] = old[S.ROT_VEL] + aRot
+        new[S.LIFT_VEL] = old[S.LIFT_VEL] + aLift
+        new[S.ARM_VEL] = old[S.ARM_VEL] + aArm
 
-        /* Integrate the drive encoder counts. */
-        val slip1 = 0.0 * noise()
-        val slip2 = 0.0 * noise()
-        val slip3 = 0.0 * noise()
-        val r1 = 0.0 // TODO these need to be real values
-        val r2 = 0.0
-        val r3 = 0.0
-        new[S_ENC1] = old[S_ENC1] + old[S_VLONG] + r1 * old[S_VROT] + slip1
-        new[S_ENC2] = old[S_ENC2] + old[S_VLONG] + r2 * old[S_VROT] + slip2
-        new[S_ENC3] = old[S_ENC3] + old[S_VLAT] + r3 * old[S_VROT] + slip3
+        /* Calculate displacements measured by each encoder. */
+        val leftDriveMeters = old[S.LONG_VEL] - DRIVE_ENC_LEFT_POS * old[S.ROT_VEL]
+        val rightDriveMeters = old[S.LONG_VEL] + DRIVE_ENC_RIGHT_POS * old[S.ROT_VEL]
+        val centerDriveMeters = old[S.LONG_VEL] + DRIVE_ENC_CENTER_POS * old[S.ROT_VEL]
+        val liftMeters = old[S.LIFT_VEL]
+        val armRads = old[S.ARM_VEL]
 
-        /* Integrate claw velocity to find position. */
-        new[S_LIFT_X] = old[S_LIFT_X] + old[S_LIFT_V]
+        /* Convert encoder displacements to ticks. */
+        val leftDriveTicks = DRIVE_METERS_PER_TICK * leftDriveMeters
+        val rightDriveTicks = DRIVE_METERS_PER_TICK * rightDriveMeters
+        val centerDriveTicks = DRIVE_METERS_PER_TICK * centerDriveMeters
+        val liftTicks = LIFT_METERS_PER_TICK * liftMeters
+        val armTicks = ARM_RADS_PER_TICK * armRads
 
-        /* Integrate forces on lifter. */
-        val aLift = 0.0 + 0.0 * noise()
-        new[S_LIFT_V] = old[S_LIFT_V] + aLift
+        /* Add noise terms for occasional skipping/slipping, ~1 tick/100 sec. */
+        val leftDriveSlip = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        val rightDriveSlip = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        val centerDriveSlip = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        val leftLiftSlip = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        val rightLiftSlip = 0.01 * CYCLE_PERIOD_SECONDS * noise()
+        val armSlip = 0.01 * CYCLE_PERIOD_SECONDS * noise()
 
-        /* Integrate lifter encoder counts. */
-        val slip4 = 0.0 * noise()
-        val slip5 = 0.0 * noise()
-        new[S_LIFT_ENC1] = old[S_LIFT_ENC1] + old[S_LIFT_V] + slip4
-        new[S_LIFT_ENC2] = old[S_LIFT_ENC2] + old[S_LIFT_V] + slip5
+        new[S.ENC_DRIVE_LEFT] = old[S.ENC_DRIVE_LEFT] + leftDriveTicks + leftDriveSlip
+        new[S.ENC_DRIVE_RIGHT] = old[S.ENC_DRIVE_RIGHT] + rightDriveTicks + rightDriveSlip
+        new[S.ENC_DRIVE_CENTER] = old[S.ENC_DRIVE_CENTER] + centerDriveTicks + centerDriveSlip
+        new[S.ENC_LIFT_LEFT] = old[S.ENC_LIFT_LEFT] + liftTicks + leftLiftSlip
+        new[S.ENC_LIFT_RIGHT] = old[S.ENC_LIFT_RIGHT] + liftTicks + rightLiftSlip
+        new[S.ENC_ARM] = old[S.ENC_ARM] + armTicks + armSlip
     }
 
-    override val estimate get() = with(estimator.estimate) {
+    override val estimate get() = estimator.estimate.mean.let {
         StateEstimate(
-            drive = DriveStateEstimate(
-                xMeters = mean[S_X],
-                yMeters = mean[S_Y],
-                yawRads = mean[S_YAW],
-                latMetersPerCycle = mean[S_VLAT],
-                longMetersPerCycle = mean[S_VLONG],
-                rotRadsPerCycle = mean[S_VROT],
-            ),
-            claw = ClawStateEstimate(
-                heightMeters = mean[S_LIFT_X],
-            )
+            xMeters = it[S.X],
+            yMeters = it[S.Y],
+            yawRads = it[S.YAW],
+            latMetersPerCycle = it[S.LAT_VEL],
+            longMetersPerCycle = it[S.LONG_VEL],
+            rotRadsPerCycle = it[S.ROT_VEL],
+            liftHeightMeters = it[S.LIFT_HEIGHT],
+            armAngleRads = it[S.ARM_ANGLE],
         )
     }
 }

@@ -1,19 +1,12 @@
 package org.firstinspires.ftc.teamcode.core.types
 
-data class DriveStateEstimate(
+data class StateEstimate(
     val xMeters: Double,
     val yMeters: Double,
     val yawRads: Double,
     val latMetersPerCycle: Double,
     val longMetersPerCycle: Double,
     val rotRadsPerCycle: Double,
-)
-
-data class ClawStateEstimate(
-    val heightMeters: Double,
-)
-
-data class StateEstimate(
-    val drive: DriveStateEstimate,
-    val claw: ClawStateEstimate,
+    val liftHeightMeters: Double,
+    val armAngleRads: Double,
 )

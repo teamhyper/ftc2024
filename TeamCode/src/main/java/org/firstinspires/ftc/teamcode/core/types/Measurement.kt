@@ -4,16 +4,6 @@
 
 package org.firstinspires.ftc.teamcode.core.types
 
-data class DriveEncoderMeasurement(
-    val leftMeters: Double,
-    val rightMeters: Double,
-    val centerMeters: Double,
-)
-
-data class IMUMeasurement(
-    val yawRads: Double
-)
-
 data class AprilTagMeasurement(
     val id: Int,
     val xMeters: Double,
@@ -21,27 +11,14 @@ data class AprilTagMeasurement(
     val zMeters: Double,
 )
 
-data class DriveCameraMeasurement(
-    val aprilTags: List<AprilTagMeasurement>
-)
-
-data class ClawCameraMeasurement(
-    val todo: Unit,
-)
-
-data class DriveMeasurement(
-    val encoders: DriveEncoderMeasurement,
-    val imu: IMUMeasurement,
-    val camera: DriveCameraMeasurement,
-)
-
-data class ClawMeasurement(
-    val heightMeters: Double,
-    val isHome: Boolean,
-    val camera: ClawCameraMeasurement,
-)
-
 data class Measurement(
-    val drive: DriveMeasurement,
-    val claw: ClawMeasurement,
+    val leftDriveEncTicks: Double,
+    val rightDriveEncTicks: Double,
+    val centerDriveEncTicks: Double,
+    val leftLiftEncTicks: Double,
+    val rightLiftEncTicks: Double,
+    val armEncTicks: Double,
+    val liftIsHome: Boolean,
+    val imuYawRads: Double,
+    val aprilTags: List<AprilTagMeasurement>,
 )
