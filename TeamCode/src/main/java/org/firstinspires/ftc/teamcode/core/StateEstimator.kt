@@ -164,7 +164,7 @@ fun stateEstimator(
         /* Calculate displacements measured by each encoder. */
         val leftDriveMeters = old[S.LONG_VEL] - DRIVE_ENC_LEFT_POS * old[S.ROT_VEL]
         val rightDriveMeters = old[S.LONG_VEL] + DRIVE_ENC_RIGHT_POS * old[S.ROT_VEL]
-        val centerDriveMeters = old[S.LONG_VEL] + DRIVE_ENC_CENTER_POS * old[S.ROT_VEL]
+        val centerDriveMeters = old[S.LAT_VEL] + DRIVE_ENC_CENTER_POS * old[S.ROT_VEL]
         val liftMeters = old[S.LIFT_VEL]
         val armRads = old[S.ARM_VEL]
 
