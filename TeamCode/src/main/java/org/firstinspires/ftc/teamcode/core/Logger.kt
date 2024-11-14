@@ -10,6 +10,7 @@ import org.firstinspires.ftc.teamcode.core.types.Control
 import org.firstinspires.ftc.teamcode.core.types.DriveReference
 import org.firstinspires.ftc.teamcode.core.types.Measurement
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,7 +29,7 @@ interface Logger: AutoCloseable {
 }
 
 fun logger(telemetry: Telemetry) = object : Logger {
-    val dir
+    val dir: File
     init {
         val sdcard = Environment.getExternalStorageDirectory()
         val sdf = SimpleDateFormat("yyyy-MM-dd_hh-mm-ss", Locale.US)
