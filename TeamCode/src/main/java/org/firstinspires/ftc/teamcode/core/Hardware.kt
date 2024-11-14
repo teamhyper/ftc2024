@@ -120,6 +120,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
     */
 
     /* The drive camera is used for detecting AprilTags. */
+    /*
     val driveAprilTagProcessor = AprilTagProcessor.Builder()
         .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
         .setTagLibrary(AprilTagGameDatabase.getIntoTheDeepTagLibrary())
@@ -134,6 +135,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
             .setAutoStartStreamOnBuild(true)
             .build()
     }
+     */
 
     /*
      * Set all control hubs to use MANUAL mode.  This improves performance, but
@@ -158,14 +160,14 @@ fun hardware(hw: HardwareMap) = object : Hardware {
             rightLiftEncTicks = rightLiftMotor.currentPosition.toDouble(),
             liftIsHome = liftLimit.isPressed,
             imuYawRads = 0.0 /*imu.robotYawPitchRollAngles.getYaw(AngleUnit.RADIANS)*/,
-            aprilTags = driveAprilTagProcessor.freshDetections?.map {
+            aprilTags = /*driveAprilTagProcessor.freshDetections?.map {
                 AprilTagMeasurement(
                     id = it.id,
                     xMeters = it.ftcPose.x,
                     yMeters = it.ftcPose.y,
                     zMeters = it.ftcPose.z,
                 )
-            } ?: emptyList(),
+            } ?:*/ emptyList(),
             armEncTicks = armMotor.currentPosition.toDouble(),
         )
     }
