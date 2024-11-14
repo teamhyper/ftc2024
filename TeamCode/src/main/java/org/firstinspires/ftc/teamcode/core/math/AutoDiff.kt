@@ -52,7 +52,7 @@ operator fun<T> Expr<T>.plus(e: Expr<T>) = Expr(
 operator fun<T> Expr<T>.minus(e: Expr<T>) = this + (-e)
 
 operator fun<T> Expr<T>.times(e: Expr<T>) = Expr(
-    nominal = nominal + e.nominal,
+    nominal = nominal * e.nominal,
     partials = (partials.keys + e.partials.keys).associate {
         // product rule
         // remember, from SCHOOL????
