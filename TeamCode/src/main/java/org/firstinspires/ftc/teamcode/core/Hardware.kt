@@ -109,6 +109,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
     }
 
     /* The IMU is additionally used by the drivetrain for state estimation. */
+    /*
     val imu = hw.getIMU("imu").apply {
         initialize(IMU.Parameters(RevHubOrientationOnRobot(
             RevHubOrientationOnRobot.LogoFacingDirection.FORWARD,
@@ -116,6 +117,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
         )))
         resetYaw()
     }
+    */
 
     /* The drive camera is used for detecting AprilTags. */
     val driveAprilTagProcessor = AprilTagProcessor.Builder()
@@ -155,7 +157,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
             leftLiftEncTicks = leftLiftMotor.currentPosition.toDouble(),
             rightLiftEncTicks = rightLiftMotor.currentPosition.toDouble(),
             liftIsHome = liftLimit.isPressed,
-            imuYawRads = imu.robotYawPitchRollAngles.getYaw(AngleUnit.RADIANS),
+            imuYawRads = 0.0 /*imu.robotYawPitchRollAngles.getYaw(AngleUnit.RADIANS)*/,
             aprilTags = driveAprilTagProcessor.freshDetections?.map {
                 AprilTagMeasurement(
                     id = it.id,
