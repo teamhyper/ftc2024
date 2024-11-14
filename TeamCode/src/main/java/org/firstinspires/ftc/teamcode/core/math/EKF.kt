@@ -178,16 +178,19 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
                 eqn.partials[EKFVar.StateVar(j)] ?: 0.0
             }
         }
-        val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
-            val eqn = equations[i]
-            if (eqn == null) {
-                /* By default: no additional noise terms */
-                0.0
-            } else {
-                eqn.partials[EKFVar.NoiseVar(j)] ?: 0.0
+        stateVar = f dot stateVar dot f.transpose()
+        if (noiseCount > 0) {
+            val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
+                val eqn = equations[i]
+                if (eqn == null) {
+                    /* By default: no additional noise terms */
+                    0.0
+                } else {
+                    eqn.partials[EKFVar.NoiseVar(j)] ?: 0.0
+                }
             }
+            stateVar = stateVar + l dot l.transpose()
         }
-        stateVar = (f dot stateVar dot f.transpose()) + (l dot l.transpose())
     }
 
     override fun measure(model: MeasureEKF.() -> Unit) {
