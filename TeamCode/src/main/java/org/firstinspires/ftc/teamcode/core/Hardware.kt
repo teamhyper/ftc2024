@@ -52,22 +52,22 @@ fun hardware(hw: HardwareMap) = object : Hardware {
      * the power signal, not the position signal.  We use the encoders on the
      * dead wheels ourselves to decide this signal.
      */
-    val frontLeftDriveMotor = hw.getMotor("drive_front_left").apply {
+    val frontLeftDriveMotor = hw.getMotor("Front_Left").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.REVERSE
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-    val frontRightDriveMotor = hw.getMotor("drive_front_right").apply {
+    val frontRightDriveMotor = hw.getMotor("Front_Right").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-    val backLeftDriveMotor = hw.getMotor("drive_back_left").apply {
+    val backLeftDriveMotor = hw.getMotor("Back_Left").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.REVERSE
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-    val backRightDriveMotor = hw.getMotor("drive_back_right").apply {
+    val backRightDriveMotor = hw.getMotor("Back_Right").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
@@ -85,26 +85,26 @@ fun hardware(hw: HardwareMap) = object : Hardware {
      * have two motors stuck together, and we want to make sure they don't run
      * against each other by always feeding them the same power signal.
      */
-    val leftLiftMotor = hw.getMotor("lift_left").apply {
+    val leftLiftMotor = hw.getMotor("Right_Lift").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-    val rightLiftMotor = hw.getMotor("lift_right").apply {
+    val rightLiftMotor = hw.getMotor("Left_Lift").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.REVERSE
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-    val liftLimit = hw.getTouchSensor("lift_limit")
-    val armMotor = hw.getMotor("arm").apply {
+    val liftLimit = hw.getTouchSensor("Lift_Sensor")
+    val armMotor = hw.getMotor("Arm").apply {
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
     }
-    val clawTwistServo = hw.getServo("claw_twist").apply {
+    val clawTwistServo = hw.getServo("Wrist").apply {
         direction = Servo.Direction.FORWARD
     }
-    val clawGripServo = hw.getServo("claw_grip").apply {
+    val clawGripServo = hw.getServo("Claw").apply {
         direction = Servo.Direction.FORWARD
     }
 
