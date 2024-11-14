@@ -110,10 +110,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
     var stateMean: D1Array<Double>
     var stateVar: D2Array<Double>
     init {
-        /*
-         * First, run the user-supplied initializer to figure out how many state
-         * variables there are.
-         */
+        /* Collect information from user-supplied model. */
         val equations = mutableMapOf<Int, EKFExpr>()
         var noiseCount = 0
         object : InitEKF {
@@ -129,15 +126,11 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
 
         /* Now we can use that to allocate our state. */
         dimension = (equations.keys.maxOrNull() ?: -1) + 1
-        stateMean = mk.zeros(dimension)
-        stateVar = mk.zeros(dimension, dimension)
-
-        /* And update the state with default values. */
-        predict {
-            for (i in 0..<dimension) {
-                new[i] = equations[i] ?: constant(0.0)
-            }
+        stateMean = mk.d1array(dimension) { equations[it]?.nominal ?: 0.0 }
+        val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
+            equations[i]?.partials[EKFVar.NoiseVar(j)] ?: 0.0
         }
+        stateVar = l dot l.transpose()
     }
 
     override fun predict(model: PredictEKF.() -> Unit) {
@@ -181,13 +174,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
         stateVar = f dot stateVar dot f.transpose()
         if (noiseCount > 0) {
             val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
-                val eqn = equations[i]
-                if (eqn == null) {
-                    /* By default: no additional noise terms */
-                    0.0
-                } else {
-                    eqn.partials[EKFVar.NoiseVar(j)] ?: 0.0
-                }
+                equations[i]?.partials[EKFVar.NoiseVar(j)] ?: 0.0
             }
             stateVar = stateVar + l dot l.transpose()
         }
