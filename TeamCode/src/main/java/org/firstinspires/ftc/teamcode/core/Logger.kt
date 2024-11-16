@@ -41,6 +41,7 @@ fun logger(telemetry: Telemetry) = object : Logger {
 
     val measWriter = dir.resolve("meas.csv").printWriter()
     val measCsv = csv<Measurement> {
+        column("time") { it.timeSeconds }
         column("drive_enc_left") { it.leftDriveEncTicks }
         column("drive_enc_right") { it.rightDriveEncTicks }
         column("drive_enc_center") { it.centerDriveEncTicks }

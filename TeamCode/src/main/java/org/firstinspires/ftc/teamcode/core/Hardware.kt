@@ -18,6 +18,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.IMU
 import com.qualcomm.robotcore.hardware.Servo
+import com.qualcomm.robotcore.util.ElapsedTime
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.teamcode.core.ext.getAllHubs
@@ -146,6 +147,8 @@ fun hardware(hw: HardwareMap) = object : Hardware {
         it.bulkCachingMode = LynxModule.BulkCachingMode.MANUAL
     }
 
+    val timer = ElapsedTime()
+
     /*
      * Called at the start of each control cycle.  Read data from all sensors.
      */
@@ -169,6 +172,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
                 )
             } ?:*/ emptyList(),
             armEncTicks = armMotor.currentPosition.toDouble(),
+            timeSeconds = timer.seconds(),
         )
     }
 

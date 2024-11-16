@@ -21,4 +21,5 @@ data class Measurement(
     val liftIsHome: Boolean,
     val imuYawRads: Double,
     val aprilTags: List<AprilTagMeasurement>,
+    val timeSeconds: Double,
 )
