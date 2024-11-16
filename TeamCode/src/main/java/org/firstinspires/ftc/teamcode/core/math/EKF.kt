@@ -176,7 +176,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
             val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
                 equations[i]?.partials[EKFVar.NoiseVar(j)] ?: 0.0
             }
-            stateVar = stateVar + l dot l.transpose()
+            stateVar = stateVar + (l dot l.transpose())
         }
     }
 
