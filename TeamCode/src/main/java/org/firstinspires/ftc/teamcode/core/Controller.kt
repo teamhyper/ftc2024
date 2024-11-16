@@ -90,7 +90,7 @@ fun controller() = object : Controller {
         /* Add drive feed-forward */
         val latPower = latFB + command.driveLatFF
         val longPower = longFB + command.driveLongFF
-        val rotPower = rotFB + command.driveLongFF
+        val rotPower = rotFB + command.driveRotFF
 
         /* Convert to wheel speeds. */
         val scale = 1.0 / max(1.0, abs(latPower) + abs(longPower) + abs(rotPower))
