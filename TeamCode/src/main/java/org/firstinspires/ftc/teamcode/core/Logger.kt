@@ -26,6 +26,7 @@ interface Logger: AutoCloseable {
     fun logPosterior(state: StateEstimate)
     fun logCommand(command: Command)
     fun logControl(control: Control)
+    fun flush()
 }
 
 fun logger(telemetry: Telemetry) = object : Logger {
@@ -148,10 +149,20 @@ fun logger(telemetry: Telemetry) = object : Logger {
         controlWriter.writeCsvRow(controlCsv, control)
     }
 
+    override fun flush() {
+        measWriter.flush()
+        priorWriter.flush()
+        posteriorWriter.flush()
+        commandWriter.flush()
+        controlWriter.flush()
+        telemetry.update()
+    }
+
     override fun close() {
         measWriter.close()
         priorWriter.close()
         posteriorWriter.close()
+        commandWriter.close()
         controlWriter.close()
     }
 }

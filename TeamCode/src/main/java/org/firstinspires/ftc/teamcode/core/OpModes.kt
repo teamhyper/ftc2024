@@ -48,8 +48,9 @@ open class StandardOpMode: LinearOpMode() {
                 logger.logMeasurement(measurement)
                 logger.logPrior(oldState)
                 logger.logPosterior(state)
+                logger.logCommand(command)
                 logger.logControl(control)
-                telemetry.update()
+                logger.flush()
 
                 /* Sleep until next cycle. */
                 while (cycleTimer.seconds() < CYCLE_PERIOD_SECONDS) sleep(1)
