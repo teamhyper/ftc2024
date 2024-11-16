@@ -121,7 +121,6 @@ fun hardware(hw: HardwareMap) = object : Hardware {
     */
 
     /* The drive camera is used for detecting AprilTags. */
-    /*
     val driveAprilTagProcessor = AprilTagProcessor.Builder()
         .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
         .setTagLibrary(AprilTagGameDatabase.getIntoTheDeepTagLibrary())
@@ -136,7 +135,6 @@ fun hardware(hw: HardwareMap) = object : Hardware {
             .setAutoStartStreamOnBuild(true)
             .build()
     }
-     */
 
     /*
      * Set all control hubs to use MANUAL mode.  This improves performance, but
