@@ -8,6 +8,7 @@ import org.firstinspires.ftc.teamcode.core.csv.writeCsvRow
 import org.firstinspires.ftc.teamcode.core.types.Command
 import org.firstinspires.ftc.teamcode.core.types.Control
 import org.firstinspires.ftc.teamcode.core.types.DriveReference
+import org.firstinspires.ftc.teamcode.core.types.LiftState
 import org.firstinspires.ftc.teamcode.core.types.Measurement
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
 import java.io.File
@@ -53,6 +54,9 @@ fun logger(telemetry: Telemetry) = object : Logger {
     init { measWriter.writeCsvHeader(measCsv) }
     override fun logMeasurement(meas: Measurement) {
         measWriter.writeCsvRow(measCsv, meas)
+        telemetry.addLine("left encoder: ${meas.leftDriveEncTicks}")
+        telemetry.addLine("right encoder: ${meas.rightDriveEncTicks}")
+        telemetry.addLine("center encoder: ${meas.centerDriveEncTicks}")
     }
 
     val priorWriter = dir.resolve("state_prior.csv").printWriter()
@@ -61,7 +65,12 @@ fun logger(telemetry: Telemetry) = object : Logger {
         column("drive_x") { it.xMeters }
         column("drive_y") { it.yMeters }
         column("drive_yaw") { it.yawRads }
-        column("lift_height") { it.liftHeightMeters }
+        column("lift_height") {
+            when (it.liftState) {
+                is LiftState.Unknown -> "null"
+                is LiftState.AtHeight -> it.liftState.heightMeters
+            }
+        }
         column("arm_angle") { it.armAngleRads }
         column("drive_lat_vel") { it.latMetersPerCycle }
         column("drive_long_vel") { it.longMetersPerCycle }
@@ -81,7 +90,10 @@ fun logger(telemetry: Telemetry) = object : Logger {
         telemetry.addLine("lateral velocity: ${state.latMetersPerCycle * CYCLE_PERIOD_SECONDS} m/s")
         telemetry.addLine("longitudinal velocity: ${state.longMetersPerCycle * CYCLE_PERIOD_SECONDS} m/s")
         telemetry.addLine("angular velocity: ${state.rotRadsPerCycle * CYCLE_PERIOD_SECONDS} rad/s")
-        telemetry.addLine("lift height: ${state.liftHeightMeters} m")
+        when (state.liftState) {
+            is LiftState.Unknown -> telemetry.addLine("lift not homed")
+            is LiftState.AtHeight -> telemetry.addLine("lift height: ${state.liftState.heightMeters} m")
+        }
         telemetry.addLine("arm angle: ${state.armAngleRads} rad")
         posteriorWriter.writeCsvRow(stateCsv, state)
     }

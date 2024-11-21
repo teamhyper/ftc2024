@@ -7,6 +7,11 @@ data class StateEstimate(
     val latMetersPerCycle: Double,
     val longMetersPerCycle: Double,
     val rotRadsPerCycle: Double,
-    val liftHeightMeters: Double,
+    val liftState: LiftState,
     val armAngleRads: Double,
 )
+
+sealed class LiftState {
+    object Unknown : LiftState()
+    data class AtHeight(val heightMeters: Double): LiftState()
+}

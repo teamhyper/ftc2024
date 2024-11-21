@@ -77,7 +77,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
      * The encoders on the dead wheels are plugged into the motor encoder
      * ports, so we define aliases here.
      */
-    val leftDriveEncoder = frontLeftDriveMotor
+    val leftDriveEncoder = backLeftDriveMotor
     val rightDriveEncoder = frontRightDriveMotor
     val centerDriveEncoder = backRightDriveMotor
 
@@ -155,7 +155,7 @@ fun hardware(hw: HardwareMap) = object : Hardware {
         controlHubs.forEach { it.clearBulkCache() }
         return Measurement(
             leftDriveEncTicks = leftDriveEncoder.currentPosition.toDouble(),
-            rightDriveEncTicks = rightDriveEncoder.currentPosition.toDouble(),
+            rightDriveEncTicks = -rightDriveEncoder.currentPosition.toDouble(),
             centerDriveEncTicks = centerDriveEncoder.currentPosition.toDouble(),
             leftLiftEncTicks = leftLiftMotor.currentPosition.toDouble(),
             rightLiftEncTicks = rightLiftMotor.currentPosition.toDouble(),

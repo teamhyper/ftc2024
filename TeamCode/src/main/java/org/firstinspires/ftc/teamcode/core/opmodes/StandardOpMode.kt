@@ -1,16 +1,22 @@
-package org.firstinspires.ftc.teamcode.core
+package org.firstinspires.ftc.teamcode.core.opmodes
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.util.ElapsedTime
+import org.firstinspires.ftc.teamcode.core.CYCLE_PERIOD_SECONDS
+import org.firstinspires.ftc.teamcode.core.Controller
+import org.firstinspires.ftc.teamcode.core.Hardware
+import org.firstinspires.ftc.teamcode.core.Logger
+import org.firstinspires.ftc.teamcode.core.Planner
+import org.firstinspires.ftc.teamcode.core.controller
+import org.firstinspires.ftc.teamcode.core.estimator.StateEstimator
+import org.firstinspires.ftc.teamcode.core.estimator.stateEstimator
 import org.firstinspires.ftc.teamcode.core.ext.userInput
+import org.firstinspires.ftc.teamcode.core.hardware
+import org.firstinspires.ftc.teamcode.core.logger
 
-@TeleOp(name = "Standard TeleOp")
-class StandardTeleOp(): StandardOpMode()
-
-open class StandardOpMode: LinearOpMode() {
+abstract class StandardOpMode: LinearOpMode() {
     open fun createStateEstimator(): StateEstimator = stateEstimator()
-    open fun createPlanner(): Planner = planner()
+    abstract fun createPlanner(): Planner
     open fun createController(): Controller = controller()
     open fun createHardware(): Hardware = hardware(hardwareMap)
     open fun createLogger(): Logger = logger(telemetry)

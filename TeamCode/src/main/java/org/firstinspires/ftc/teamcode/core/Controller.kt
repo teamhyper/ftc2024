@@ -4,6 +4,7 @@ import org.firstinspires.ftc.teamcode.core.math.pid
 import org.firstinspires.ftc.teamcode.core.types.Command
 import org.firstinspires.ftc.teamcode.core.types.Control
 import org.firstinspires.ftc.teamcode.core.types.DriveReference
+import org.firstinspires.ftc.teamcode.core.types.LiftState
 import org.firstinspires.ftc.teamcode.core.types.StateEstimate
 import kotlin.math.abs
 import kotlin.math.cos
@@ -27,13 +28,12 @@ interface Controller {
 }
 
 fun controller() = object : Controller {
-    /* All these parameters are 0 for now. */
-    val latPosPID = pid()
-    val longPosPID = pid()
-    val yawPosPID = pid()
-    val latVelPID = pid()
-    val longVelPID = pid()
-    val rotVelPID = pid()
+    val latPosPID = pid(kp = 1.0)
+    val longPosPID = pid(kp = 1.0)
+    val yawPosPID = pid(kp = 1.0)
+    val latVelPID = pid(kp = 1.0)
+    val longVelPID = pid(kp = 1.0)
+    val rotVelPID = pid(kp = 1.0)
     val liftPID = pid()
     val armPID = pid()
 
@@ -100,10 +100,13 @@ fun controller() = object : Controller {
         val backRightPower = scale * (latPower + longPower + rotPower)
 
         /* Compute lift and arm PID */
-        val liftFB = liftPID.follow(
-            target = command.liftHeightMeters,
-            measured = state.liftHeightMeters,
-        )
+        val liftFB = when (state.liftState) {
+            is LiftState.Unknown -> 0.0
+            is LiftState.AtHeight -> liftPID.follow(
+                target = command.liftHeightMeters,
+                measured = state.liftState.heightMeters,
+            )
+        }
         val liftPower = liftFB + command.liftFF
         val armFB = armPID.follow(
             target = command.armAngleRads,
