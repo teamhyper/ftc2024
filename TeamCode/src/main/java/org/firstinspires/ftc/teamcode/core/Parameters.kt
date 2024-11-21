@@ -10,7 +10,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Position
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles
 import kotlin.math.PI
 
-const val CYCLE_PERIOD_SECONDS = 0.01 /* 10 ms -> 100 Hz */
+const val CYCLE_PERIOD_SECONDS = 0.05 /* 50 ms -> 20 Hz */
 /* see: https://www.gobilda.com/4-bar-odometry-pod-32mm-wheel/ */
 const val ODOMETRY_PPR = 2000
 const val ODOMETRY_WHEEL_DIAMETER_METERS = 0.032
