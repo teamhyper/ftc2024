@@ -156,28 +156,26 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
                 variable(EKFVar.NoiseVar(noiseCount++), 0.0)
         }.model()
 
-        /* Update the mean estimate for those that changed. */
-        for ((i, expr) in equations) {
-            stateMean[i] = expr.nominal
+        /* Pack the data into matrices. */
+        val x = mk.d1array(dimension) { i ->
+            equations[i]?.nominal ?: stateMean[i]
+        }
+        val f = mk.d2arrayIndices(dimension, dimension) { i, j ->
+            equations[i].let {
+                if (it == null) {
+                    if (i == j) 1.0 else 0.0 /* By default: new[i] = old[i] */
+                } else {
+                    it.partials[EKFVar.StateVar(j)] ?: 0.0
+                }
+            }
+        }
+        val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
+            equations[i]?.partials[EKFVar.NoiseVar(j)] ?: 0.0
         }
 
-        /* Also update the covariance matrix. */
-        val f = mk.d2arrayIndices(dimension, dimension) { i, j ->
-            val eqn = equations[i]
-            if (eqn == null) {
-                /* By default: new[i] = old[i] */
-                if (i == j) 1.0 else 0.0
-            } else {
-                eqn.partials[EKFVar.StateVar(j)] ?: 0.0
-            }
-        }
-        stateVar = f dot stateVar dot f.transpose()
-        if (noiseCount > 0) {
-            val l = mk.d2arrayIndices(dimension, noiseCount) { i, j ->
-                equations[i]?.partials[EKFVar.NoiseVar(j)] ?: 0.0
-            }
-            stateVar = stateVar + (l dot l.transpose())
-        }
+        /* Perform the time update. */
+        stateMean = x
+        stateVar = (f dot stateVar dot f.transpose()) + (l dot l.transpose())
     }
 
     override fun measure(model: MeasureEKF.() -> Unit) {
@@ -214,7 +212,7 @@ fun ekf(init: InitEKF.() -> Unit) = object : EKF {
 
         /* Perform the measurement update. */
         val v = (h dot stateVar dot h.transpose()) + (m dot m.transpose())
-        val k = stateVar dot h.transpose() dot mk.linalg.inv(v)
+        val k = mk.linalg.solve(v, h dot stateVar).transpose()
         val l = mk.identity<Double>(dimension) - (k dot h)
         stateMean = stateMean + (k dot e)
         stateVar = (l dot stateVar dot l.transpose()) + (k dot k.transpose())
