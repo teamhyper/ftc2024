@@ -148,7 +148,7 @@ fun logger(telemetry: Telemetry) = object : Logger {
     val controlCsv = csv<Control> {
         column("drive_front_left") { it.frontLeftDrivePower }
         column("drive_front_right") { it.frontRightDrivePower }
-        column("drive_back_left") { it.backRightDrivePower }
+        column("drive_back_left") { it.backLeftDrivePower }
         column("drive_back_right") { it.backRightDrivePower }
         column("lift") { it.liftPower }
         column("arm") { it.armPower }
