@@ -18,7 +18,3 @@ interface Planner {
      */
     fun process(input: UserInput, state: StateEstimate): Command
 }
-
-enum class GripState { OPEN, CLOSED }
-enum class TwistState { HORIZONTAL, VERTICAL }
-

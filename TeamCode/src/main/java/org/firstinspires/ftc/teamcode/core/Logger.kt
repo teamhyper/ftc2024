@@ -54,9 +54,9 @@ fun logger(telemetry: Telemetry) = object : Logger {
     init { measWriter.writeCsvHeader(measCsv) }
     override fun logMeasurement(meas: Measurement) {
         measWriter.writeCsvRow(measCsv, meas)
-        telemetry.addLine("left encoder: ${meas.leftDriveEncTicks}")
-        telemetry.addLine("right encoder: ${meas.rightDriveEncTicks}")
-        telemetry.addLine("center encoder: ${meas.centerDriveEncTicks}")
+        telemetry.addData("left encoder", "%.3f", meas.leftDriveEncTicks)
+        telemetry.addData("right encoder", "%.3f", meas.rightDriveEncTicks)
+        telemetry.addData("center encoder", "%.3f", meas.centerDriveEncTicks)
     }
 
     val priorWriter = dir.resolve("state_prior.csv").printWriter()
@@ -157,8 +157,8 @@ fun logger(telemetry: Telemetry) = object : Logger {
     }
     init { controlWriter.writeCsvHeader(controlCsv) }
     override fun logControl(control: Control) {
-        telemetry.addLine("claw twist: ${control.clawTwistDutyCycle}")
-        telemetry.addLine("claw grip: ${control.clawGripDutyCycle}")
+        telemetry.addData("claw twist", "%.3f", control.clawTwistDutyCycle)
+        telemetry.addData("claw grip", "%.3f", control.clawGripDutyCycle)
         controlWriter.writeCsvRow(controlCsv, control)
     }
 

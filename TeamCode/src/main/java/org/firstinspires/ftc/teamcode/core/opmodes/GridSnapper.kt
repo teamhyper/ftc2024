@@ -10,8 +10,8 @@ import org.firstinspires.ftc.teamcode.core.types.StateEstimate
 import org.firstinspires.ftc.teamcode.core.types.UserInput
 import kotlin.math.PI
 
-/* 2 ft = 0.6096 m */
-const val GRID_METERS = 0.6096
+/* 1 ft = 0.3048 m */
+const val GRID_METERS = 0.3048
 const val ANGLE_STEP_RADS = PI / 4
 
 @TeleOp(name = "Grid Snapper")

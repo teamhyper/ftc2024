@@ -28,8 +28,9 @@ interface Controller {
 }
 
 fun controller() = object : Controller {
-    val latPosPID = pid(kp = 1.0)
-    val longPosPID = pid(kp = 1.0)
+    /* guesses.  todo: actual control theory */
+    val latPosPID = pid(kp = 4.0)
+    val longPosPID = pid(kp = 2.0)
     val yawPosPID = pid(kp = 1.0)
     val latVelPID = pid(kp = 1.0)
     val longVelPID = pid(kp = 1.0)
